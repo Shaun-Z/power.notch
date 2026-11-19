@@ -195,6 +195,17 @@ struct ContentView: View {
                         //                    }
                         //                    .keyboardShortcut("E", modifiers: .command)
                     }
+                if vm.notchState == .closed
+                    && Defaults[.enableLyrics]
+                    && musicManager.isPlaying
+                    && (!musicManager.syncedLyrics.isEmpty || !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    && coordinator.musicLiveActivityEnabled
+                    && !vm.hideOnClosed
+                {
+                    ClosedNotchLyricView()
+                        .frame(width: computedChinWidth, height: 20)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
                 if vm.chinHeight > 0 {
                     Rectangle()
                         .fill(Color.black.opacity(0.01))
