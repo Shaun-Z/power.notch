@@ -3703,6 +3703,7 @@
       }
     },
     "Boring Notch" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -3803,6 +3804,7 @@
       }
     },
     "boring.notch" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -16310,6 +16312,9 @@
         }
       }
     },
+    "powerNotch" : {
+
+    },
     "Preferred display" : {
       "localizations" : {
         "ar" : {
@@ -17912,6 +17917,7 @@
       }
     },
     "Restart Boring Notch" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -18010,6 +18016,9 @@
           }
         }
       }
+    },
+    "Restart powerNotch" : {
+
     },
     "Running" : {
       "extractionState" : "stale",

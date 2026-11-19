@@ -257,7 +257,7 @@
 		14C08BB52C8DE42D000F8AA0 /* CalendarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarManager.swift; sourceTree = "<group>"; };
 		14C08BB82C8DE4B1000F8AA0 /* BoringCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoringCalendar.swift; sourceTree = "<group>"; };
 		14C08BC02C8E03AD000F8AA0 /* NSImage+Extensions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSImage+Extensions.swift"; sourceTree = "<group>"; };
-		14CEF4122C5CAED300855D72 /* Boring Notch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Boring Notch.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		14CEF4122C5CAED300855D72 /* powerNotch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = powerNotch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		14CEF4152C5CAED300855D72 /* boringNotchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotchApp.swift; sourceTree = "<group>"; };
 		14CEF4172C5CAED300855D72 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		14CEF4192C5CAED400855D72 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -285,7 +285,7 @@
 		9A0887342C7AFF8E00C160EA /* TabSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSelectionView.swift; sourceTree = "<group>"; };
 		9A987A032C73CA66005CA465 /* ShelfView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
 		9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotchHomeView.swift; sourceTree = "<group>"; };
-		9BB15A1D30AEF17E00C7A364 /* ClosedNotchLyricView.swift */ = {isa = PBXFileReference; path = ClosedNotchLyricView.swift; sourceTree = "<group>"; };
+		9BB15A1D30AEF17E00C7A364 /* ClosedNotchLyricView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClosedNotchLyricView.swift; sourceTree = "<group>"; };
 		B10348D82C74E56000475897 /* ConditionalModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionalModifier.swift; sourceTree = "<group>"; };
 		B10F84A22C6C9596009F3026 /* TestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestView.swift; sourceTree = "<group>"; };
 		B141C2402CA5F53E00AC8CC8 /* SparkleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleView.swift; sourceTree = "<group>"; };
@@ -554,7 +554,7 @@
 		14CEF4132C5CAED300855D72 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				14CEF4122C5CAED300855D72 /* Boring Notch.app */,
+				14CEF4122C5CAED300855D72 /* powerNotch.app */,
 				11F7484F2EC9AABA00F841DB /* BoringNotchXPCHelper.xpc */,
 			);
 			name = Products;
@@ -819,7 +819,7 @@
 				111BEA6E2ED166E20079DD4E /* MacroVisionKit */,
 			);
 			productName = dynamicNotch;
-			productReference = 14CEF4122C5CAED300855D72 /* Boring Notch.app */;
+			productReference = 14CEF4122C5CAED300855D72 /* powerNotch.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -1238,8 +1238,8 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = boringNotch/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Boring Notch";
-				INFOPLIST_KEY_CFBundleName = "Boring Notch";
+				INFOPLIST_KEY_CFBundleDisplayName = powerNotch;
+				INFOPLIST_KEY_CFBundleName = powerNotch;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSBackgroundOnly = NO;
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -1255,7 +1255,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 2.7.3;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch;
-				PRODUCT_NAME = "Boring Notch";
+				PRODUCT_NAME = powerNotch;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = targeted;
@@ -1292,8 +1292,8 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = boringNotch/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Boring Notch";
-				INFOPLIST_KEY_CFBundleName = "Boring Notch";
+				INFOPLIST_KEY_CFBundleDisplayName = powerNotch;
+				INFOPLIST_KEY_CFBundleName = powerNotch;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSBackgroundOnly = NO;
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -1309,7 +1309,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 2.7.3;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch;
-				PRODUCT_NAME = "Boring Notch";
+				PRODUCT_NAME = powerNotch;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = targeted;
