@@ -41,12 +41,16 @@ class BoringViewModel: NSObject, ObservableObject {
     let webcamManager = WebcamManager.shared
     @Published var isCameraExpanded: Bool = false
     @Published var isRequestingAuthorization: Bool = false
+    @Published private(set) var hasRevealedOpenSongInfo: Bool = false
+    private var openSongInfoRevealTask: Task<Void, Never>?
     
     deinit {
         destroy()
     }
 
     func destroy() {
+        openSongInfoRevealTask?.cancel()
+        openSongInfoRevealTask = nil
         cancellables.forEach { $0.cancel() }
         cancellables.removeAll()
     }
@@ -192,9 +196,28 @@ class BoringViewModel: NSObject, ObservableObject {
     }
 
     func open() {
+        let wasClosed = self.notchState == .closed
         self.physicalNotchSize = getPhysicalNotchSize(screenUUID: self.screenUUID)
         self.notchSize = openNotchSize
         self.notchState = .open
+
+        if wasClosed {
+            openSongInfoRevealTask?.cancel()
+            openSongInfoRevealTask = nil
+
+            if coordinator.currentView == .home {
+                hasRevealedOpenSongInfo = false
+                openSongInfoRevealTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .seconds(NotchLyricMotion.openFlightDuration))
+                    guard !Task.isCancelled, let self, self.notchState == .open else { return }
+                    withAnimation(.easeOut(duration: 0.20)) {
+                        self.hasRevealedOpenSongInfo = true
+                    }
+                }
+            } else {
+                hasRevealedOpenSongInfo = true
+            }
+        }
         
         // Force music information update when notch is opened
         MusicManager.shared.forceUpdate()
@@ -205,6 +228,10 @@ class BoringViewModel: NSObject, ObservableObject {
         if SharingStateManager.shared.preventNotchClose {
             return
         }
+        openSongInfoRevealTask?.cancel()
+        openSongInfoRevealTask = nil
+        hasRevealedOpenSongInfo = false
+
         self.notchSize = getClosedNotchSize(screenUUID: self.screenUUID)
         self.closedNotchSize = self.notchSize
         self.physicalNotchSize = getPhysicalNotchSize(screenUUID: self.screenUUID)

@@ -36,16 +36,15 @@ struct OpenNotchHUD: View {
                     Image(systemName: value > 0.5 ? "light.max" : "light.min")
                         .contentTransition(.interpolate)
                 case .mic:
-                    Image(systemName: "mic")
-                        .symbolVariant(value > 0 ? .none : .slash)
+                    Image(systemName: value > 0 ? "mic.fill" : "mic.slash.fill")
                         .contentTransition(.interpolate)
                 default:
                     EmptyView()
                 }
             }
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(.white)
-            .frame(width: 20, alignment: .center)
+            .font(.system(size: NotchHeaderMetrics.iconSize, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.92))
+            .frame(width: 18, alignment: .center)
             
             // Slider or Status Text
             if type != .mic {
@@ -55,35 +54,36 @@ struct OpenNotchHUD: View {
                 .frame(width: showPercentage ? 65 : 108) // Fixed width for consistency
             } else {
                 Text(value > 0 ? "Unmuted" : "Muted")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.92))
                     .fixedSize()
             }
             
             // Percentage Text
             if type != .mic && showPercentage {
                 Text("\(Int(value * 100))%")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.gray)
+                    .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.76))
                     .monospacedDigit()
-                    .frame(width: 35, alignment: .trailing)
+                    .frame(width: 34, alignment: .trailing)
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            Capsule()
-                .fill(Color.black.opacity(liquidGlassNotch ? 0.35 : 1.0))
-                .stroke(Color.white.opacity(liquidGlassNotch ? 0.22 : 0.1), lineWidth: 1)
+        .frame(height: NotchHeaderMetrics.controlHeight)
+        .notchHeaderGlassSurface(
+            isLiquidGlass: liquidGlassNotch,
+            isActive: false,
+            isHovering: false,
+            isInteractive: false
         )
     }
     
     func SpeakerSymbol(_ value: CGFloat) -> String {
         switch(value) {
-            case 0: return "speaker.slash"
-            case 0...0.33: return "speaker.wave.1"
-            case 0.33...0.66: return "speaker.wave.2"
-            default: return "speaker.wave.3"
+            case 0: return "speaker.slash.fill"
+            case 0...0.33: return "speaker.wave.1.fill"
+            case 0.33...0.66: return "speaker.wave.2.fill"
+            default: return "speaker.wave.3.fill"
         }
     }
     

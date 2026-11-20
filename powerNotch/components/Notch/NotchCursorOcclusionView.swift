@@ -166,18 +166,27 @@ final class SkyLightCursorController {
 struct NotchCursorOcclusionView: NSViewRepresentable {
     let isEnabled: Bool
     let physicalNotchSize: CGSize?
+    let activeNotchSize: CGSize
     var onPointerExitedNotch: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> NotchCursorOcclusionNSView {
         let view = NotchCursorOcclusionNSView()
         view.onPointerExitedNotch = onPointerExitedNotch
-        view.updateConfiguration(isEnabled: isEnabled, physicalNotchSize: physicalNotchSize)
+        view.updateConfiguration(
+            isEnabled: isEnabled,
+            physicalNotchSize: physicalNotchSize,
+            activeNotchSize: activeNotchSize
+        )
         return view
     }
 
     func updateNSView(_ nsView: NotchCursorOcclusionNSView, context: Context) {
         nsView.onPointerExitedNotch = onPointerExitedNotch
-        nsView.updateConfiguration(isEnabled: isEnabled, physicalNotchSize: physicalNotchSize)
+        nsView.updateConfiguration(
+            isEnabled: isEnabled,
+            physicalNotchSize: physicalNotchSize,
+            activeNotchSize: activeNotchSize
+        )
     }
 }
 
@@ -187,6 +196,7 @@ final class NotchCursorOcclusionNSView: NSView {
 
     private var isOcclusionEnabled: Bool = false
     private var physicalNotchSize: CGSize?
+    private var activeNotchSize: CGSize = openNotchSize
 
     private var globalMonitor: Any?
     private var localMonitor: Any?
@@ -240,12 +250,14 @@ final class NotchCursorOcclusionNSView: NSView {
         }
     }
 
-    func updateConfiguration(isEnabled: Bool, physicalNotchSize: CGSize?) {
+    func updateConfiguration(isEnabled: Bool, physicalNotchSize: CGSize?, activeNotchSize: CGSize) {
         let active = isEnabled && (physicalNotchSize?.height ?? 0) > 0
         let sizeChanged = self.physicalNotchSize != physicalNotchSize
+            || self.activeNotchSize != activeNotchSize
 
         self.isOcclusionEnabled = active
         self.physicalNotchSize = physicalNotchSize
+        self.activeNotchSize = activeNotchSize
 
         if sizeChanged {
             cachedMaskImage = nil
@@ -271,25 +283,38 @@ final class NotchCursorOcclusionNSView: NSView {
         }
     }
 
+    private var activeNotchRect: NSRect {
+        guard bounds.width > 0, bounds.height > 0 else { return .zero }
+        let width = min(bounds.width, max(0, activeNotchSize.width))
+        let height = min(bounds.height, max(0, activeNotchSize.height))
+        guard width > 0, height > 0 else { return .zero }
+        return NSRect(
+            x: bounds.midX - width / 2,
+            y: 0,
+            width: width,
+            height: height
+        )
+    }
+
     private var occlusionZoneRect: NSRect {
+        let notchBounds = activeNotchRect
         guard let physicalNotch = physicalNotchSize,
               physicalNotch.height > 0,
-              bounds.width > 0,
-              bounds.height > 0
+              !notchBounds.isEmpty
         else {
             return .zero
         }
 
-        let clampedWidth = min(physicalNotch.width, max(0, bounds.width - 44))
-        let clampedHeight = min(physicalNotch.height, bounds.height * 0.45)
+        let clampedWidth = min(physicalNotch.width, max(0, notchBounds.width - 44))
+        let clampedHeight = min(physicalNotch.height, notchBounds.height * 0.45)
 
         // Wide enough that both the pure-black core and Gaussian veil reach alpha == 0
         // well inside the zone perimeter so hardware <-> software handoff is invisible.
-        let zoneWidth = min(bounds.width, clampedWidth + clampedHeight * 4.8)
-        let zoneHeight = min(bounds.height, clampedHeight * 3.4)
+        let zoneWidth = min(notchBounds.width, clampedWidth + clampedHeight * 4.8)
+        let zoneHeight = min(notchBounds.height, clampedHeight * 3.4)
 
         return NSRect(
-            x: bounds.midX - zoneWidth / 2,
+            x: notchBounds.midX - zoneWidth / 2,
             y: 0,
             width: zoneWidth,
             height: zoneHeight
@@ -353,7 +378,7 @@ final class NotchCursorOcclusionNSView: NSView {
         let windowPoint = window.convertPoint(fromScreen: screenPoint)
         let localPoint = convert(windowPoint, from: nil)
 
-        let isInsideNotch = bounds.contains(localPoint)
+        let isInsideNotch = activeNotchRect.contains(localPoint)
         let exitedNotchAfterHiding = wasInsideNotchBounds && !isInsideNotch && didHideDuringOpenSession
         wasInsideNotchBounds = isInsideNotch
 
@@ -435,8 +460,9 @@ final class NotchCursorOcclusionNSView: NSView {
         )
         guard key != cachedMaskKey else { return }
 
-        let clampedWidth = min(physicalNotch.width, max(0, bounds.width - 44))
-        let clampedHeight = min(physicalNotch.height, bounds.height * 0.45)
+        let notchBounds = activeNotchRect
+        let clampedWidth = min(physicalNotch.width, max(0, notchBounds.width - 44))
+        let clampedHeight = min(physicalNotch.height, notchBounds.height * 0.45)
 
         // Render the exact same Gaussian black core + mid-range veil as
         // NotchGlassBackground.hardwareNotchDarkTransition, feathered softly to 0

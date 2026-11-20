@@ -40,37 +40,34 @@ struct BatteryView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .leading) {
+        let clampedLevel = max(0, min(100, CGFloat(levelBattery)))
+        let maxFillWidth = max(0, batteryWidth * 0.77)
+        let fillWidth = (clampedLevel / 100) * maxFillWidth
+        let fillHeight = max(5, batteryWidth * 0.305)
+        let leadingInset = max(1.75, batteryWidth * 0.075)
+        let cornerRadius = max(1.6, batteryWidth * 0.08)
+        let statusIconSize = min(16, batteryWidth * 0.58)
 
+        ZStack(alignment: .leading) {
             Image(systemName: icon)
                 .resizable()
-                .fontWeight(.thin)
+                .fontWeight(isForNotification ? .thin : .regular)
                 .aspectRatio(contentMode: .fit)
-                .foregroundColor(.white.opacity(0.5))
-                .frame(
-                    width: batteryWidth + 1
-                )
+                .foregroundStyle(.white.opacity(isForNotification ? 0.5 : 0.65))
+                .frame(width: batteryWidth + 1)
 
-            RoundedRectangle(cornerRadius: 2.5)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(batteryColor)
-                .frame(
-                    width: CGFloat(((CGFloat(CFloat(levelBattery)) / 100) * (batteryWidth - 6))),
-                    height: (batteryWidth - 2.75) - 18
-                )
-                .padding(.leading, 2)
-
+                .frame(width: fillWidth, height: fillHeight)
+                .padding(.leading, leadingInset)
+        }
+        .overlay(alignment: .center) {
             if iconStatus != "" && (isForNotification || Defaults[.showPowerStatusIcons]) {
-                ZStack {
-                    Image(iconStatus)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .foregroundColor(.white)
-                        .frame(
-                            width: 17,
-                            height: 17
-                        )
-                }
-                .frame(width: batteryWidth, height: batteryWidth)
+                Image(iconStatus)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .foregroundStyle(.white)
+                    .frame(width: statusIconSize, height: statusIconSize)
             }
         }
     }
@@ -184,31 +181,85 @@ struct BoringBatteryView: View {
     @State private var isHoveringPopover: Bool = false
     @State private var hideTask: Task<Void, Never>? = nil
 
+    @Default(.liquidGlassNotch) private var liquidGlassNotch
+    @Default(.showBatteryPercentage) private var showBatteryPercentage
     @EnvironmentObject var vm: BoringViewModel
 
     var body: some View {
-        Button(action: {
-            withAnimation {
-                showPopupMenu.toggle()
-            }
-        }) {
-            HStack {
-                if Defaults[.showBatteryPercentage] {
-                    Text("\(Int32(levelBattery))%")
-                        .font(.callout)
-                        .foregroundStyle(.white)
+        Group {
+            if isForNotification {
+                Button(action: {
+                    withAnimation {
+                        showPopupMenu.toggle()
+                    }
+                }) {
+                    HStack {
+                        if showBatteryPercentage {
+                            Text("\(Int32(levelBattery))%")
+                                .font(.callout)
+                                .foregroundStyle(.white)
+                        }
+                        BatteryView(
+                            levelBattery: levelBattery,
+                            isPluggedIn: isPluggedIn,
+                            isCharging: isCharging,
+                            isInLowPowerMode: isInLowPowerMode,
+                            batteryWidth: batteryWidth,
+                            isForNotification: isForNotification
+                        )
+                    }
                 }
-                BatteryView(
-                    levelBattery: levelBattery,
-                    isPluggedIn: isPluggedIn,
-                    isCharging: isCharging,
-                    isInLowPowerMode: isInLowPowerMode,
-                    batteryWidth: batteryWidth,
-                    isForNotification: isForNotification
-                )
+                .buttonStyle(ScaleButtonStyle())
+            } else {
+                Button(action: {
+                    withAnimation {
+                        showPopupMenu.toggle()
+                    }
+                }) {
+                    HStack(spacing: 5) {
+                        if showBatteryPercentage {
+                            Text("\(Int32(levelBattery))%")
+                                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(
+                                    Color.white.opacity(
+                                        showPopupMenu ? 1.0 : (isHoveringButton ? 0.96 : 0.88)
+                                    )
+                                )
+                        }
+                        BatteryView(
+                            levelBattery: levelBattery,
+                            isPluggedIn: isPluggedIn,
+                            isCharging: isCharging,
+                            isInLowPowerMode: isInLowPowerMode,
+                            batteryWidth: batteryWidth,
+                            isForNotification: isForNotification
+                        )
+                    }
+                    .padding(.horizontal, showBatteryPercentage ? 9 : 8)
+                    .frame(height: NotchHeaderMetrics.controlHeight)
+                    .contentShape(Capsule())
+                    .notchHeaderGlassSurface(
+                        isLiquidGlass: liquidGlassNotch,
+                        isActive: showPopupMenu,
+                        isHovering: isHoveringButton,
+                        isInteractive: true
+                    )
+                }
+                .buttonStyle(NotchHeaderPressStyle())
+                .onHover { hovering in
+                    withAnimation(.easeOut(duration: 0.16)) {
+                        isHoveringButton = hovering
+                    }
+                    if hovering {
+                        hideTask?.cancel()
+                        hideTask = nil
+                    } else if showPopupMenu {
+                        scheduleHideIfNeeded()
+                    }
+                }
             }
         }
-        .buttonStyle(ScaleButtonStyle())
         .popover(
             isPresented: $showPopupMenu,
             arrowEdge: .bottom) {
@@ -255,7 +306,7 @@ struct BoringBatteryView: View {
 
 #Preview {
     BoringBatteryView(
-        batteryWidth: 30,
+        batteryWidth: 23,
         isCharging: false,
         isInLowPowerMode: false,
         isPluggedIn: true,
@@ -263,5 +314,7 @@ struct BoringBatteryView: View {
         maxCapacity: 100,
         timeToFullCharge: 10,
         isForNotification: false
-    ).frame(width: 200, height: 200)
+    )
+    .environmentObject(BoringViewModel())
+    .frame(width: 200, height: 200)
 }

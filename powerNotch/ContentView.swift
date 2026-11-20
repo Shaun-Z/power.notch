@@ -40,7 +40,7 @@ struct ContentView: View {
     @Default(.liquidGlassNotch) var liquidGlassNotch
 
     // Shared interactive spring for movement/resizing to avoid conflicting animations
-    private let animationSpring = Animation.interactiveSpring(response: 0.38, dampingFraction: 0.8, blendDuration: 0)
+    private let animationSpring = Animation.interactiveSpring(response: 0.38, dampingFraction: 1.0, blendDuration: 0)
 
     private let extendedHoverPadding: CGFloat = 30
     private let zeroHeightHoverPadding: CGFloat = 10
@@ -140,17 +140,6 @@ struct ContentView: View {
                             )
                         }
                     }
-                    .overlay {
-                        if liquidGlassNotch {
-                            NotchCursorOcclusionView(
-                                isEnabled: isLiquidGlassOpen && !vm.anyDropZoneTargeting && !vm.isBatteryPopoverActive,
-                                physicalNotchSize: vm.physicalNotchSize,
-                                onPointerExitedNotch: {
-                                    handleHover(false)
-                                }
-                            )
-                        }
-                    }
                     .overlay(alignment: .top) {
                         Rectangle()
                             .fill(.black)
@@ -168,11 +157,13 @@ struct ContentView: View {
                 mainLayout
                     .frame(height: vm.notchState == .open ? vm.notchSize.height : nil)
                     .conditionalModifier(true) { view in
-                        let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
-                        let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
-                        
                         return view
-                            .animation(vm.notchState == .open ? openAnimation : closeAnimation, value: vm.notchState)
+                            .animation(
+                                vm.notchState == .open
+                                    ? NotchLyricMotion.openAnimation
+                                    : NotchLyricMotion.closeAnimation,
+                                value: vm.notchState
+                            )
                             .animation(.smooth, value: gestureProgress)
                     }
                     .contentShape(Rectangle())
@@ -243,16 +234,19 @@ struct ContentView: View {
                         //                    }
                         //                    .keyboardShortcut("E", modifiers: .command)
                     }
-                if vm.notchState == .closed
+                let shouldShowClosedLyrics = vm.notchState == .closed
                     && Defaults[.enableLyrics]
                     && musicManager.isPlaying
                     && (!musicManager.syncedLyrics.isEmpty || !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     && coordinator.musicLiveActivityEnabled
                     && !vm.hideOnClosed
-                {
-                    ClosedNotchLyricView()
+
+                if shouldShowClosedLyrics {
+                    Color.clear
                         .frame(width: computedChinWidth, height: 20)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .anchorPreference(key: NotchLyricAnchorKey.self, value: .bounds) {
+                            NotchLyricAnchors(closed: $0)
+                        }
                 }
                 if vm.chinHeight > 0 {
                     Rectangle()
@@ -263,6 +257,30 @@ struct ContentView: View {
         }
         .padding(.bottom, 8)
         .frame(maxWidth: windowSize.width, maxHeight: windowSize.height, alignment: .top)
+        .overlayPreferenceValue(NotchLyricAnchorKey.self) { anchors in
+            let showClosedLyrics = vm.notchState == .closed
+                && Defaults[.enableLyrics]
+                && musicManager.isPlaying
+                && (!musicManager.syncedLyrics.isEmpty || !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                && coordinator.musicLiveActivityEnabled
+                && !vm.hideOnClosed
+            let showOpenLyrics = vm.notchState == .open
+                && Defaults[.enableLyrics]
+                && coordinator.currentView == .home
+
+            GeometryReader { proxy in
+                NotchUnifiedLyricOverlay(
+                    anchors: anchors,
+                    proxy: proxy,
+                    isOpen: vm.notchState == .open,
+                    showClosedLyrics: showClosedLyrics,
+                    showOpenLyrics: showOpenLyrics,
+                    isLiquidGlass: liquidGlassNotch,
+                    gestureProgress: gestureProgress
+                )
+            }
+            .allowsHitTesting(false)
+        }
         .conditionalModifier(gestureProgress != 0 || !liquidGlassNotch) { view in
             view.compositingGroup()
         }
@@ -272,6 +290,21 @@ struct ContentView: View {
             anchor: .top
         )
         .animation(.smooth, value: gestureProgress)
+        .overlay {
+            if liquidGlassNotch {
+                NotchCursorOcclusionView(
+                    isEnabled: isLiquidGlassOpen && !vm.anyDropZoneTargeting && !vm.isBatteryPopoverActive,
+                    physicalNotchSize: vm.physicalNotchSize,
+                    activeNotchSize: openNotchSize,
+                    onPointerExitedNotch: {
+                        handleHover(false)
+                    }
+                )
+                .frame(width: windowSize.width, height: windowSize.height)
+                .transaction { $0.animation = nil }
+                .allowsHitTesting(false)
+            }
+        }
         .background(dragDetector)
         .preferredColorScheme(.dark)
         .environmentObject(vm)
@@ -355,7 +388,7 @@ struct ContentView: View {
                           BoringFaceAnimation()
                        } else if vm.notchState == .open {
                            BoringHeader()
-                               .frame(height: max(24, vm.effectiveClosedNotchHeight))
+                               .frame(height: max(NotchHeaderMetrics.controlHeight, vm.effectiveClosedNotchHeight))
                                .opacity(gestureProgress != 0 ? 1.0 - min(abs(gestureProgress) * 0.1, 0.3) : 1.0)
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
@@ -564,7 +597,7 @@ struct ContentView: View {
     }
 
     private func doOpen() {
-        withAnimation(animationSpring) {
+        withAnimation(NotchLyricMotion.openAnimation) {
             vm.open()
         }
     }
@@ -616,12 +649,11 @@ struct ContentView: View {
                         return
                     }
 
-                    withAnimation(animationSpring) {
+                    withAnimation(NotchLyricMotion.closeAnimation) {
                         self.isHovering = false
-                    }
-                    
-                    if self.vm.notchState == .open && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose {
-                        self.vm.close()
+                        if self.vm.notchState == .open && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose {
+                            self.vm.close()
+                        }
                     }
                 }
             }
@@ -667,12 +699,12 @@ struct ContentView: View {
         }
 
         if translation > Defaults[.gestureSensitivity] {
-            withAnimation(animationSpring) {
+            withAnimation(NotchLyricMotion.closeAnimation) {
                 isHovering = false
-            }
-            if !SharingStateManager.shared.preventNotchClose { 
-                gestureProgress = .zero
-                vm.close()
+                if !SharingStateManager.shared.preventNotchClose {
+                    gestureProgress = .zero
+                    vm.close()
+                }
             }
 
             if Defaults[.enableHaptics] {

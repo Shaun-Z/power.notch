@@ -136,6 +136,18 @@ struct MusicControlsView: View {
     @Default(.musicControlSlots) private var slotConfig
     @Default(.musicControlSlotLimit) private var slotLimit
 
+    private var shouldWaitForLyricFlight: Bool {
+        Defaults[.enableLyrics]
+            && musicManager.isPlaying
+            && (!musicManager.syncedLyrics.isEmpty
+                || !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            && BoringViewCoordinator.shared.musicLiveActivityEnabled
+    }
+
+    private var showSongTitleAndArtist: Bool {
+        !shouldWaitForLyricFlight || vm.hasRevealedOpenSongInfo
+    }
+
     var body: some View {
         VStack(alignment: .leading) {
             songInfoAndSlider
@@ -157,51 +169,36 @@ struct MusicControlsView: View {
 
     private func songInfo(width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            MarqueeText(
-                $musicManager.songTitle, font: .headline, nsFont: .headline, textColor: .white,
-                frameWidth: width)
-            MarqueeText(
-                $musicManager.artistName,
-                font: .headline,
-                nsFont: .headline,
-                textColor: Defaults[.playerColorTinting]
-                    ? Color(nsColor: musicManager.avgColor)
-                        .ensureMinimumBrightness(factor: 0.6) : .gray,
-                frameWidth: width
-            )
-            .fontWeight(.medium)
+            VStack(alignment: .leading, spacing: 0) {
+                MarqueeText(
+                    $musicManager.songTitle,
+                    font: .headline,
+                    nsFont: .headline,
+                    textColor: .white,
+                    frameWidth: width
+                )
+                MarqueeText(
+                    $musicManager.artistName,
+                    font: .headline,
+                    nsFont: .headline,
+                    textColor: Defaults[.playerColorTinting]
+                        ? Color(nsColor: musicManager.avgColor)
+                            .ensureMinimumBrightness(factor: 0.6) : .gray,
+                    frameWidth: width
+                )
+                .fontWeight(.medium)
+            }
+            .opacity(showSongTitleAndArtist ? 1 : 0)
+
             if Defaults[.enableLyrics] {
-                TimelineView(.animation(minimumInterval: 0.25)) { timeline in
-                    let currentElapsed: Double = {
-                        guard musicManager.isPlaying else { return musicManager.elapsedTime }
-                        let delta = timeline.date.timeIntervalSince(musicManager.timestampDate)
-                        let progressed = musicManager.elapsedTime + (delta * musicManager.playbackRate)
-                        return min(max(progressed, 0), musicManager.songDuration)
-                    }()
-                    let line: String = {
-                        if musicManager.isFetchingLyrics { return "Loading lyrics…" }
-                        if !musicManager.syncedLyrics.isEmpty {
-                            return musicManager.lyricLine(at: currentElapsed)
-                        }
-                        let trimmed = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
-                        return trimmed.isEmpty ? "No lyrics found" : trimmed.replacingOccurrences(of: "\n", with: " ")
-                    }()
-                    let isPersian = line.unicodeScalars.contains { scalar in
-                        let v = scalar.value
-                        return v >= 0x0600 && v <= 0x06FF
-                    }
-                    MarqueeText(
-                        .constant(line),
-                        font: .subheadline,
-                        nsFont: .subheadline,
-                        textColor: musicManager.isFetchingLyrics ? .gray.opacity(0.7) : .gray,
-                        frameWidth: width
+                Color.clear
+                    .frame(
+                        width: width,
+                        height: NSFont.preferredFont(forTextStyle: .subheadline).pointSize * 1.4
                     )
-                    .font(isPersian ? .custom("Vazirmatn-Regular", size: NSFont.preferredFont(forTextStyle: .subheadline).pointSize) : .subheadline)
-                    .lineLimit(1)
-                    .opacity(musicManager.isPlaying ? 1 : 0)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
+                    .anchorPreference(key: NotchLyricAnchorKey.self, value: .bounds) {
+                        NotchLyricAnchors(open: $0)
+                    }
             }
         }
     }
@@ -478,7 +475,7 @@ struct NotchHomeView: View {
                     .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.76, blendDuration: 0), value: shouldShowCamera)
             }
         }
-        .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity))
+        .transition(.opacity)
         .blur(radius: vm.notchState == .closed ? 30 : 0)
     }
 }

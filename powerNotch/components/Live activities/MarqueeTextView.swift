@@ -87,7 +87,7 @@ struct MarqueeText: View {
             .frame(width: frameWidth, alignment: .leading)
             .clipped()
         }
-        .frame(height: textSize.height * 1.3)
+        .frame(height: (textSize.height > 0 ? textSize.height : NSFont.preferredFont(forTextStyle: nsFont).pointSize) * 1.3)
         
     }
 }
