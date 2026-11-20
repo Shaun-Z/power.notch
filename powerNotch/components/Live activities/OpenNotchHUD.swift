@@ -14,6 +14,7 @@ struct OpenNotchHUD: View {
     @Binding var value: CGFloat
     @Binding var icon: String
     @Default(.showOpenNotchHUDPercentage) var showPercentage
+    @Default(.liquidGlassNotch) var liquidGlassNotch
     
     var body: some View {
         HStack(spacing: 8) {
@@ -72,8 +73,8 @@ struct OpenNotchHUD: View {
         .padding(.vertical, 6)
         .background(
             Capsule()
-                .fill(Color.black)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                .fill(Color.black.opacity(liquidGlassNotch ? 0.35 : 1.0))
+                .stroke(Color.white.opacity(liquidGlassNotch ? 0.22 : 0.1), lineWidth: 1)
         )
     }
     

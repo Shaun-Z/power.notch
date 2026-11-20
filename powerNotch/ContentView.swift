@@ -37,24 +37,37 @@ struct ContentView: View {
 
     @Default(.showNotHumanFace) var showNotHumanFace
 
+    @Default(.liquidGlassNotch) var liquidGlassNotch
+
     // Shared interactive spring for movement/resizing to avoid conflicting animations
     private let animationSpring = Animation.interactiveSpring(response: 0.38, dampingFraction: 0.8, blendDuration: 0)
 
     private let extendedHoverPadding: CGFloat = 30
     private let zeroHeightHoverPadding: CGFloat = 10
 
+    private var isLiquidGlassOpen: Bool {
+        vm.notchState == .open && liquidGlassNotch
+    }
+
     private var topCornerRadius: CGFloat {
-       ((vm.notchState == .open) && Defaults[.cornerRadiusScaling])
-                ? cornerRadiusInsets.opened.top
-                : cornerRadiusInsets.closed.top
+        guard vm.notchState == .open && Defaults[.cornerRadiusScaling] else {
+            return cornerRadiusInsets.closed.top
+        }
+        return liquidGlassNotch ? 22 : cornerRadiusInsets.opened.top
+    }
+
+    private var bottomCornerRadius: CGFloat {
+        guard vm.notchState == .open && Defaults[.cornerRadiusScaling] else {
+            return cornerRadiusInsets.closed.bottom
+        }
+        return liquidGlassNotch ? 34 : cornerRadiusInsets.opened.bottom
     }
 
     private var currentNotchShape: NotchShape {
         NotchShape(
             topCornerRadius: topCornerRadius,
-            bottomCornerRadius: ((vm.notchState == .open) && Defaults[.cornerRadiusScaling])
-                ? cornerRadiusInsets.opened.bottom
-                : cornerRadiusInsets.closed.bottom
+            bottomCornerRadius: bottomCornerRadius,
+            liquidCurve: liquidGlassNotch
         )
     }
 
@@ -95,23 +108,58 @@ struct ContentView: View {
                     .padding(
                         .horizontal,
                         vm.notchState == .open
-                        ? Defaults[.cornerRadiusScaling]
-                        ? (cornerRadiusInsets.opened.top) : (cornerRadiusInsets.opened.bottom)
+                        ? (Defaults[.cornerRadiusScaling] ? topCornerRadius : cornerRadiusInsets.opened.bottom)
                         : cornerRadiusInsets.closed.bottom
                     )
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-                    .background(.black)
                     .clipShape(currentNotchShape)
+                    .background(
+                        NotchGlassBackground(
+                            isOpen: vm.notchState == .open,
+                            useLiquidGlass: liquidGlassNotch,
+                            topCornerRadius: topCornerRadius,
+                            bottomCornerRadius: bottomCornerRadius,
+                            physicalNotchSize: vm.physicalNotchSize,
+                            showRim: false
+                        )
+                    )
+                    .conditionalModifier(!liquidGlassNotch) { view in
+                        view
+                            .shadow(
+                                color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
+                                    ? .black.opacity(0.7) : .clear,
+                                radius: Defaults[.cornerRadiusScaling] ? 6 : 4
+                            )
+                    }
+                    .overlay {
+                        if liquidGlassNotch {
+                            NotchLiquidGlassRim(
+                                isOpen: vm.notchState == .open,
+                                topCornerRadius: topCornerRadius,
+                                bottomCornerRadius: bottomCornerRadius
+                            )
+                        }
+                    }
+                    .overlay {
+                        if liquidGlassNotch {
+                            NotchCursorOcclusionView(
+                                isEnabled: isLiquidGlassOpen && !vm.anyDropZoneTargeting && !vm.isBatteryPopoverActive,
+                                physicalNotchSize: vm.physicalNotchSize,
+                                onPointerExitedNotch: {
+                                    handleHover(false)
+                                }
+                            )
+                        }
+                    }
                     .overlay(alignment: .top) {
                         Rectangle()
                             .fill(.black)
-                            .frame(height: 1)
-                            .padding(.horizontal, topCornerRadius)
+                            .frame(
+                                width: isLiquidGlassOpen ? (vm.physicalNotchSize?.width ?? 0) : nil,
+                                height: 1
+                            )
+                            .padding(.horizontal, isLiquidGlassOpen ? 0 : topCornerRadius)
                     }
-                    .shadow(
-                        color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
-                            ? .black.opacity(0.7) : .clear, radius: Defaults[.cornerRadiusScaling] ? 6 : 4
-                    )
                     .padding(
                         .bottom,
                         vm.effectiveClosedNotchHeight == 0 ? 10 : 0
@@ -215,7 +263,9 @@ struct ContentView: View {
         }
         .padding(.bottom, 8)
         .frame(maxWidth: windowSize.width, maxHeight: windowSize.height, alignment: .top)
-        .compositingGroup()
+        .conditionalModifier(gestureProgress != 0 || !liquidGlassNotch) { view in
+            view.compositingGroup()
+        }
         .scaleEffect(
             x: gestureScale,
             y: gestureScale,
@@ -362,10 +412,10 @@ struct ContentView: View {
                         ShelfView()
                     }
                 }
+                .padding(.top, isLiquidGlassOpen ? 10 : 0)
                 .transition(
-                    .scale(scale: 0.8, anchor: .top)
+                    .scale(scale: 0.88, anchor: .top)
                     .combined(with: .opacity)
-                    .animation(.smooth(duration: 0.35))
                 )
                 .zIndex(1)
                 .allowsHitTesting(vm.notchState == .open)
@@ -551,11 +601,21 @@ struct ContentView: View {
                 }
             }
         } else {
+            // AppKit synthesizes a spurious mouseExited (onHover(false)) whenever SkyLight
+            // hides the hardware cursor inside the open notch's dark transition zone.
+            if vm.notchState == .open && (SkyLightCursorController.shared.isHidden || vm.isMouseHovering()) {
+                return
+            }
+
             hoverTask = Task {
                 try? await Task.sleep(for: .milliseconds(100))
                 guard !Task.isCancelled else { return }
                 
                 await MainActor.run {
+                    if self.vm.notchState == .open && (SkyLightCursorController.shared.isHidden || self.vm.isMouseHovering()) {
+                        return
+                    }
+
                     withAnimation(animationSpring) {
                         self.isHovering = false
                     }

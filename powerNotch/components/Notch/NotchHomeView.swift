@@ -72,12 +72,29 @@ struct AlbumArtView: View {
         }
     }
 
+    @Default(.liquidGlassNotch) private var liquidGlassNotch
+
     private var albumArtDarkOverlay: some View {
-        Rectangle()
-            .aspectRatio(1, contentMode: .fit)
-            .foregroundColor(Color.black)
-            .opacity(musicManager.isPlaying ? 0 : 0.8)
-            .blur(radius: 50)
+        Group {
+            if liquidGlassNotch {
+                RoundedRectangle(
+                    cornerRadius: Defaults[.cornerRadiusScaling]
+                        ? MusicPlayerImageSizes.cornerRadiusInset.opened
+                        : MusicPlayerImageSizes.cornerRadiusInset.closed
+                )
+                .aspectRatio(1, contentMode: .fit)
+                .foregroundColor(Color.black)
+                .opacity(musicManager.isPlaying ? 0 : 0.45)
+                .scaleEffect(musicManager.isPlaying ? 1 : 0.85)
+                .allowsHitTesting(false)
+            } else {
+                Rectangle()
+                    .aspectRatio(1, contentMode: .fit)
+                    .foregroundColor(Color.black)
+                    .opacity(musicManager.isPlaying ? 0 : 0.8)
+                    .blur(radius: 50)
+            }
+        }
     }
                 
 

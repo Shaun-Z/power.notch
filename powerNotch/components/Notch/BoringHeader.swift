@@ -13,6 +13,7 @@ struct BoringHeader: View {
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @StateObject var tvm = ShelfStateViewModel.shared
+    @Default(.liquidGlassNotch) var liquidGlassNotch
     var body: some View {
         HStack(spacing: 0) {
             HStack {
@@ -28,8 +29,9 @@ struct BoringHeader: View {
             .zIndex(2)
 
             if vm.notchState == .open {
+                let showSolidNotchSpacer = !liquidGlassNotch && (NSScreen.screen(withUUID: coordinator.selectedScreenUUID)?.safeAreaInsets.top ?? 0 > 0)
                 Rectangle()
-                    .fill(NSScreen.screen(withUUID: coordinator.selectedScreenUUID)?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear)
+                    .fill(showSolidNotchSpacer ? .black : .clear)
                     .frame(width: vm.closedNotchSize.width)
                     .mask {
                         NotchShape()
@@ -47,7 +49,13 @@ struct BoringHeader: View {
                                 vm.toggleCameraPreview()
                             }) {
                                 Capsule()
-                                    .fill(.black)
+                                    .fill(liquidGlassNotch ? Color.white.opacity(0.10) : .black)
+                                    .overlay {
+                                        if liquidGlassNotch {
+                                            Capsule()
+                                                .stroke(Color.white.opacity(0.18), lineWidth: 0.75)
+                                        }
+                                    }
                                     .frame(width: 30, height: 30)
                                     .overlay {
                                         Image(systemName: "web.camera")
@@ -66,7 +74,13 @@ struct BoringHeader: View {
                                 
                             }) {
                                 Capsule()
-                                    .fill(.black)
+                                    .fill(liquidGlassNotch ? Color.white.opacity(0.10) : .black)
+                                    .overlay {
+                                        if liquidGlassNotch {
+                                            Capsule()
+                                                .stroke(Color.white.opacity(0.18), lineWidth: 0.75)
+                                        }
+                                    }
                                     .frame(width: 30, height: 30)
                                     .overlay {
                                         Image(systemName: "gear")

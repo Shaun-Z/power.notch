@@ -36,6 +36,7 @@ class BoringViewModel: NSObject, ObservableObject {
 
     @Published var notchSize: CGSize = getClosedNotchSize()
     @Published var closedNotchSize: CGSize = getClosedNotchSize()
+    @Published var physicalNotchSize: CGSize? = getPhysicalNotchSize()
     
     let webcamManager = WebcamManager.shared
     @Published var isCameraExpanded: Bool = false
@@ -58,6 +59,7 @@ class BoringViewModel: NSObject, ObservableObject {
         self.screenUUID = screenUUID
         notchSize = getClosedNotchSize(screenUUID: screenUUID)
         closedNotchSize = notchSize
+        physicalNotchSize = getPhysicalNotchSize(screenUUID: screenUUID)
 
         Publishers.CombineLatest3($dropZoneTargeting, $dragDetectorTargeting, $generalDropTargeting)
             .map { shelf, drag, general in
@@ -183,13 +185,14 @@ class BoringViewModel: NSObject, ObservableObject {
             let baseY = frame.maxY - notchSize.height
             let baseX = frame.midX - notchSize.width / 2
             
-            return position.y >= baseY && position.x >= baseX && position.x <= baseX + notchSize.width
+            return position.y >= baseY && position.y <= frame.maxY + 1 && position.x >= baseX && position.x <= baseX + notchSize.width
         }
         
         return false
     }
 
     func open() {
+        self.physicalNotchSize = getPhysicalNotchSize(screenUUID: self.screenUUID)
         self.notchSize = openNotchSize
         self.notchState = .open
         
@@ -204,6 +207,7 @@ class BoringViewModel: NSObject, ObservableObject {
         }
         self.notchSize = getClosedNotchSize(screenUUID: self.screenUUID)
         self.closedNotchSize = self.notchSize
+        self.physicalNotchSize = getPhysicalNotchSize(screenUUID: self.screenUUID)
         self.notchState = .closed
         self.isBatteryPopoverActive = false
         self.coordinator.sneakPeek.show = false

@@ -12,8 +12,8 @@ import SwiftUI
 let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
-let shadowPadding: CGFloat = 20
-let openNotchSize: CGSize = .init(width: 640, height: 190)
+let shadowPadding: CGFloat = 26
+let openNotchSize: CGSize = .init(width: 640, height: 226)
 let windowSize: CGSize = .init(width: openNotchSize.width, height: openNotchSize.height + shadowPadding)
 let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 19, bottom: 24), closed: (top: 6, bottom: 14))
 
@@ -34,6 +34,33 @@ enum MusicPlayerImageSizes {
     }
     
     return nil
+}
+
+/// Returns the physical hardware notch dimensions in points for the specified display
+/// by querying `NSScreen.safeAreaInsets.top` and `auxiliaryTopLeftArea` / `auxiliaryTopRightArea`.
+/// Returns `nil` for displays without a physical hardware notch.
+@MainActor func getPhysicalNotchSize(screenUUID: String? = nil) -> CGSize? {
+    var selectedScreen = NSScreen.main
+
+    if let uuid = screenUUID {
+        selectedScreen = NSScreen.screen(withUUID: uuid)
+    }
+
+    guard let screen = selectedScreen, screen.safeAreaInsets.top > 0 else {
+        return nil
+    }
+
+    let notchHeight = screen.safeAreaInsets.top
+    let notchWidth: CGFloat
+    if let topLeftWidth = screen.auxiliaryTopLeftArea?.width,
+       let topRightWidth = screen.auxiliaryTopRightArea?.width
+    {
+        notchWidth = max(0, screen.frame.width - topLeftWidth - topRightWidth)
+    } else {
+        notchWidth = notchHeight * 5.2
+    }
+
+    return CGSize(width: notchWidth, height: notchHeight)
 }
 
 @MainActor func getClosedNotchSize(screenUUID: String? = nil) -> CGSize {
