@@ -25,7 +25,7 @@ import Foundation
 /*
  To use the service from an application or other process, use NSXPCConnection to establish a connection to the service by doing something like this:
 
-     connectionToService = NSXPCConnection(serviceName: "theboringteam.powernotch.PowerNotchXPCHelper")
+     connectionToService = NSXPCConnection(serviceName: "com.powernotch.app.PowerNotchXPCHelper")
      connectionToService.remoteObjectInterface = NSXPCInterface(with: (any PowerNotchXPCHelperProtocol).self)
      connectionToService.resume()
 

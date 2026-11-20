@@ -17,15 +17,15 @@ from extract_build_number import extract_build_number  # noqa: E402
 PROJECT = """
 buildSettings = {
     CURRENT_PROJECT_VERSION = 272;
-    PRODUCT_BUNDLE_IDENTIFIER = theboringteam.powernotch;
+    PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app;
 };
 buildSettings = {
     CURRENT_PROJECT_VERSION = 272;
-    PRODUCT_BUNDLE_IDENTIFIER = theboringteam.powernotch;
+    PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app;
 };
 buildSettings = {
     CURRENT_PROJECT_VERSION = 900;
-    PRODUCT_BUNDLE_IDENTIFIER = theboringteam.powernotch.PowerNotchXPCHelper;
+    PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchXPCHelper;
 };
 buildSettings = {
     CURRENT_PROJECT_VERSION = 1;
@@ -37,7 +37,7 @@ buildSettings = {
 class ExtractBuildNumberTests(unittest.TestCase):
     def test_extracts_the_app_target_build(self) -> None:
         self.assertEqual(
-            extract_build_number(PROJECT, "theboringteam.powernotch"),
+            extract_build_number(PROJECT, "com.powernotch.app"),
             "272",
         )
 
@@ -48,7 +48,7 @@ class ExtractBuildNumberTests(unittest.TestCase):
             1,
         )
         with self.assertRaisesRegex(ValueError, "disagree"):
-            extract_build_number(disagreeing, "theboringteam.powernotch")
+            extract_build_number(disagreeing, "com.powernotch.app")
 
         with self.assertRaisesRegex(ValueError, "No build settings"):
             extract_build_number(PROJECT, "missing.bundle")
@@ -58,7 +58,7 @@ class ExtractBuildNumberTests(unittest.TestCase):
             "CURRENT_PROJECT_VERSION = beta;",
         )
         with self.assertRaisesRegex(ValueError, "positive integer"):
-            extract_build_number(non_integer, "theboringteam.powernotch")
+            extract_build_number(non_integer, "com.powernotch.app")
 
 
 if __name__ == "__main__":

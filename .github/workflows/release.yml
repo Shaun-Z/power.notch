@@ -613,11 +613,11 @@ jobs:
               system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", app_path]
             end
 
-            uninstall quit: "theboringteam.powernotch"
+            uninstall quit: "com.powernotch.app"
 
             zap trash: [
-              "~/Library/Application Scripts/theboringteam.powernotch/",
-              "~/Library/Containers/theboringteam.powernotch/",
+              "~/Library/Application Scripts/com.powernotch.app/",
+              "~/Library/Containers/com.powernotch.app/",
             ]
           end
           CASK
