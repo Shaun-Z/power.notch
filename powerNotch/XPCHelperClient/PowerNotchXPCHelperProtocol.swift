@@ -20,5 +20,20 @@ import Foundation
     func isScreenBrightnessAvailable(with reply: @escaping (Bool) -> Void)
     func currentScreenBrightness(with reply: @escaping (NSNumber?) -> Void)
     func setScreenBrightness(_ value: Float, with reply: @escaping (Bool) -> Void)
+    // Antigravity CLI usage probe (performed by the non-sandboxed helper)
+    func runAntigravityUsageProbe(with reply: @escaping (String?) -> Void)
+    // Local Apple Music TTML cache reader (performed by the non-sandboxed helper)
+    func fetchAppleMusicCachedTTML(
+        title: String,
+        artist: String,
+        album: String,
+        duration: Double,
+        with reply: @escaping (String?) -> Void
+    )
+    // Local Codex workspace credit limit reader (performed by the non-sandboxed helper)
+    func fetchCodexLocalCreditSnapshot(
+        accountId: String,
+        email: String,
+        with reply: @escaping (String?) -> Void
+    )
 }
-

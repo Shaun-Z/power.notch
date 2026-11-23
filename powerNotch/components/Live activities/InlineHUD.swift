@@ -15,6 +15,7 @@ struct InlineHUD: View {
     @Binding var icon: String
     @Binding var hoverAnimation: Bool
     @Binding var gestureProgress: CGFloat
+    @Default(.liquidGlassNotch) private var liquidGlassNotch
     var body: some View {
         HStack {
             HStack(spacing: 5) {
@@ -64,7 +65,7 @@ struct InlineHUD: View {
             .frame(width: 100 - (hoverAnimation ? 0 : 12) + gestureProgress / 2, height: vm.notchSize.height - (hoverAnimation ? 0 : 12), alignment: .leading)
             
             Rectangle()
-                .fill(.black)
+                .fill(liquidGlassNotch ? .clear : .black)
                 .frame(width: vm.closedNotchSize.width - 20)
             
             HStack {

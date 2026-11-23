@@ -225,7 +225,7 @@ struct CalendarView: View {
             }
         }
         .listRowBackground(Color.clear)
-        .frame(height: 120)
+        .frame(maxHeight: .infinity, alignment: .top)
         .onChange(of: selectedDate) {
             Task {
                 await calendarManager.updateCurrentDate(selectedDate)

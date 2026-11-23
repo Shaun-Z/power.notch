@@ -13,8 +13,15 @@ let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
 let shadowPadding: CGFloat = 26
+/// Horizontal margin reserved in the window for outward-diffusing rim halos
+let rimGlowHorizontalPadding: CGFloat = 18
+/// Maximum horizontal flare width of the hanging notch's concave top meniscus ears
+let openNotchEarMaxInset: CGFloat = 22
 let openNotchSize: CGSize = .init(width: 640, height: 226)
-let windowSize: CGSize = .init(width: openNotchSize.width, height: openNotchSize.height + shadowPadding)
+let windowSize: CGSize = .init(
+    width: openNotchSize.width + openNotchEarMaxInset * 2 + rimGlowHorizontalPadding * 2,
+    height: openNotchSize.height + shadowPadding
+)
 let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 19, bottom: 24), closed: (top: 6, bottom: 14))
 
 enum MusicPlayerImageSizes {

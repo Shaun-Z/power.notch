@@ -15,10 +15,12 @@ import SwiftUI
 struct MusicPlayerView: View {
     @EnvironmentObject var vm: BoringViewModel
     let albumArtNamespace: Namespace.ID
+    var maxArtWidth: CGFloat = 154
 
     var body: some View {
-        HStack {
-            AlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace).padding(.all, 5)
+        HStack(alignment: .bottom, spacing: 10) {
+            AlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace)
+                .frame(maxWidth: maxArtWidth)
             MusicControlsView().drawingGroup().compositingGroup()
         }
     }
@@ -28,6 +30,9 @@ struct AlbumArtView: View {
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var vm: BoringViewModel
     let albumArtNamespace: Namespace.ID
+
+    /// Concentric inner corner radius (R_outer - d = 28 - 14 = 14pt scaled, 24 - 10 = 14pt unscaled)
+    private let artCornerRadius: CGFloat = 14
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -43,10 +48,7 @@ struct AlbumArtView: View {
             .resizable()
             .clipped()
             .clipShape(
-                RoundedRectangle(
-                    cornerRadius: Defaults[.cornerRadiusScaling]
-                        ? MusicPlayerImageSizes.cornerRadiusInset.opened
-                        : MusicPlayerImageSizes.cornerRadiusInset.closed)
+                RoundedRectangle(cornerRadius: artCornerRadius, style: .continuous)
             )
             .aspectRatio(1, contentMode: .fit)
             .scaleEffect(x: 1.3, y: 1.4)
@@ -77,11 +79,7 @@ struct AlbumArtView: View {
     private var albumArtDarkOverlay: some View {
         Group {
             if liquidGlassNotch {
-                RoundedRectangle(
-                    cornerRadius: Defaults[.cornerRadiusScaling]
-                        ? MusicPlayerImageSizes.cornerRadiusInset.opened
-                        : MusicPlayerImageSizes.cornerRadiusInset.closed
-                )
+                RoundedRectangle(cornerRadius: artCornerRadius, style: .continuous)
                 .aspectRatio(1, contentMode: .fit)
                 .foregroundColor(Color.black)
                 .opacity(musicManager.isPlaying ? 0 : 0.45)
@@ -105,10 +103,7 @@ struct AlbumArtView: View {
             .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
             .clipped()
             .clipShape(
-                RoundedRectangle(
-                    cornerRadius: Defaults[.cornerRadiusScaling]
-                        ? MusicPlayerImageSizes.cornerRadiusInset.opened
-                        : MusicPlayerImageSizes.cornerRadiusInset.closed)
+                RoundedRectangle(cornerRadius: artCornerRadius, style: .continuous)
             )
     }
 
@@ -118,8 +113,8 @@ struct AlbumArtView: View {
             AppIcon(for: musicManager.bundleIdentifier ?? "com.apple.Music")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
-                .frame(width: 30, height: 30)
-                .offset(x: 10, y: 10)
+                .frame(width: 28, height: 28)
+                .offset(x: 6, y: 6)
                 .transition(.scale.combined(with: .opacity))
                 .zIndex(2)
         }
@@ -135,18 +130,7 @@ struct MusicControlsView: View {
     @State private var lastDragged: Date = .distantPast
     @Default(.musicControlSlots) private var slotConfig
     @Default(.musicControlSlotLimit) private var slotLimit
-
-    private var shouldWaitForLyricFlight: Bool {
-        Defaults[.enableLyrics]
-            && musicManager.isPlaying
-            && (!musicManager.syncedLyrics.isEmpty
-                || !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            && BoringViewCoordinator.shared.musicLiveActivityEnabled
-    }
-
-    private var showSongTitleAndArtist: Bool {
-        !shouldWaitForLyricFlight || vm.hasRevealedOpenSongInfo
-    }
+    @Default(.enableLyrics) private var enableLyrics
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -163,34 +147,31 @@ struct MusicControlsView: View {
                 musicSlider
             }
         }
-        .padding(.top, 10)
-        .padding(.leading, 5)
+        .padding(.top, 2)
+        .padding(.leading, 4)
     }
 
     private func songInfo(width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                MarqueeText(
-                    $musicManager.songTitle,
-                    font: .headline,
-                    nsFont: .headline,
-                    textColor: .white,
-                    frameWidth: width
-                )
-                MarqueeText(
-                    $musicManager.artistName,
-                    font: .headline,
-                    nsFont: .headline,
-                    textColor: Defaults[.playerColorTinting]
-                        ? Color(nsColor: musicManager.avgColor)
-                            .ensureMinimumBrightness(factor: 0.6) : .gray,
-                    frameWidth: width
-                )
-                .fontWeight(.medium)
-            }
-            .opacity(showSongTitleAndArtist ? 1 : 0)
+            MarqueeText(
+                $musicManager.songTitle,
+                font: .headline,
+                nsFont: .headline,
+                textColor: .white,
+                frameWidth: width
+            )
+            MarqueeText(
+                $musicManager.artistName,
+                font: .headline,
+                nsFont: .headline,
+                textColor: Defaults[.playerColorTinting]
+                    ? Color(nsColor: musicManager.avgColor)
+                        .ensureMinimumBrightness(factor: 0.6) : .gray,
+                frameWidth: width
+            )
+            .fontWeight(.medium)
 
-            if Defaults[.enableLyrics] {
+            if enableLyrics {
                 Color.clear
                     .frame(
                         width: width,
@@ -454,8 +435,11 @@ struct NotchHomeView: View {
     }
 
     private var mainContent: some View {
-        HStack(alignment: .top, spacing: (shouldShowCamera && Defaults[.showCalendar]) ? 10 : 15) {
-            MusicPlayerView(albumArtNamespace: albumArtNamespace)
+        HStack(alignment: .bottom, spacing: (shouldShowCamera && Defaults[.showCalendar]) ? 10 : 15) {
+            MusicPlayerView(
+                albumArtNamespace: albumArtNamespace,
+                maxArtWidth: (shouldShowCamera && Defaults[.showCalendar]) ? 136 : 154
+            )
 
             if Defaults[.showCalendar] {
                 CalendarView()
@@ -475,6 +459,8 @@ struct NotchHomeView: View {
                     .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.76, blendDuration: 0), value: shouldShowCamera)
             }
         }
+        .padding(.top, 8)
+        .frame(maxHeight: .infinity, alignment: .bottom)
         .transition(.opacity)
         .blur(radius: vm.notchState == .closed ? 30 : 0)
     }

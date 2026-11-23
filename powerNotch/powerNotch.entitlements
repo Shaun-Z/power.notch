@@ -4,11 +4,13 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(TeamIdentifierPrefix)com.powernotch.app</string>
+	</array>
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>
 	<key>com.apple.security.device.camera</key>
-	<true/>
-	<key>com.apple.security.personal-information.calendars</key>
 	<true/>
 	<key>com.apple.security.files.bookmarks.app-scope</key>
 	<true/>
@@ -20,10 +22,26 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
 	<key>com.apple.security.temporary-exception.apple-events</key>
 	<array>
 		<string>com.spotify.client</string>
 		<string>com.apple.Music</string>
+	</array>
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
+	<array>
+		<string>/.codex/</string>
+		<string>/.claude/</string>
+		<string>/.gemini/</string>
+		<string>/.local/share/opencode/</string>
+		<string>/.config/</string>
+		<string>/.copilot/</string>
+		<string>/.pi/</string>
+		<string>/.kimi-code/</string>
+		<string>/.coding-relay/</string>
+		<string>/Library/Application Support/Cursor/User/globalStorage/</string>
+		<string>/Library/Developer/Xcode/CodingAssistant/antigravity/</string>
 	</array>
 	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
 	<array>

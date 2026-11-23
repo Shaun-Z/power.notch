@@ -116,6 +116,15 @@
 		9A987A102C73CA8D005CA465 /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 9A987A0F2C73CA8D005CA465 /* Collections */; };
 		9AB0C6BD2C73C9CB00F7CD30 /* NotchHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */; };
 		9B9763D130B0178700CCA45B /* NotchCursorOcclusionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9763D030B0178700CCA45B /* NotchCursorOcclusionView.swift */; };
+		9B9763D330B0373500CCA45B /* AIUsageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9763D230B0373500CCA45B /* AIUsageModels.swift */; };
+		9B9763D530B037CA00CCA45B /* AIUsageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9763D430B037CA00CCA45B /* AIUsageManager.swift */; };
+		9B9763D730B0381A00CCA45B /* NotchAIUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9763D630B0381A00CCA45B /* NotchAIUsageView.swift */; };
+		9B9763D930B0384300CCA45B /* AIUsageSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9763D830B0384300CCA45B /* AIUsageSettingsView.swift */; };
+		9B9763EB30B2E91F00CCA45B /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B9763EA30B2E91F00CCA45B /* WidgetKit.framework */; };
+		9B9763ED30B2E91F00CCA45B /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B9763EC30B2E91F00CCA45B /* SwiftUI.framework */; };
+		9B9763F830B2E92100CCA45B /* PowerNotchWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9B9763E930B2E91F00CCA45B /* PowerNotchWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9B97640030B2E9B100CCA45B /* AIUsageWidgetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9763FF30B2E9B100CCA45B /* AIUsageWidgetBridge.swift */; };
+		9B97640630B2F04300CCA45B /* AIUsageHistoryCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B97640530B2F04300CCA45B /* AIUsageHistoryCollector.swift */; };
 		9BB15A1E30AEF17E00C7A364 /* ClosedNotchLyricView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BB15A1D30AEF17E00C7A364 /* ClosedNotchLyricView.swift */; };
 		B10348D92C74E56000475897 /* ConditionalModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10348D82C74E56000475897 /* ConditionalModifier.swift */; };
 		B10F84A32C6C9596009F3026 /* TestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10F84A22C6C9596009F3026 /* TestView.swift */; };
@@ -155,6 +164,13 @@
 			remoteGlobalIDString = 11F7484E2EC9AABA00F841DB;
 			remoteInfo = PowerNotchXPCHelper;
 		};
+		9B9763F630B2E92100CCA45B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 14CEF40A2C5CAED200855D72 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9B9763E830B2E91F00CCA45B;
+			remoteInfo = PowerNotchWidgetsExtension;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -167,6 +183,17 @@
 				11F7485B2EC9AABA00F841DB /* PowerNotchXPCHelper.xpc in Embed XPC Services */,
 			);
 			name = "Embed XPC Services";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9B9763F930B2E92100CCA45B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				9B9763F830B2E92100CCA45B /* PowerNotchWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B1ECFA062C6FE58A002ACD87 /* Embed Frameworks */ = {
@@ -286,7 +313,17 @@
 		9A0887342C7AFF8E00C160EA /* TabSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSelectionView.swift; sourceTree = "<group>"; };
 		9A987A032C73CA66005CA465 /* ShelfView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
 		9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotchHomeView.swift; sourceTree = "<group>"; };
-		9B9763D030B0178700CCA45B /* NotchCursorOcclusionView.swift */ = {isa = PBXFileReference; path = NotchCursorOcclusionView.swift; sourceTree = "<group>"; };
+		9B9763D030B0178700CCA45B /* NotchCursorOcclusionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchCursorOcclusionView.swift; sourceTree = "<group>"; };
+		9B9763D230B0373500CCA45B /* AIUsageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageModels.swift; sourceTree = "<group>"; };
+		9B9763D430B037CA00CCA45B /* AIUsageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageManager.swift; sourceTree = "<group>"; };
+		9B9763D630B0381A00CCA45B /* NotchAIUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchAIUsageView.swift; sourceTree = "<group>"; };
+		9B9763D830B0384300CCA45B /* AIUsageSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageSettingsView.swift; sourceTree = "<group>"; };
+		9B9763E930B2E91F00CCA45B /* PowerNotchWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PowerNotchWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9B9763EA30B2E91F00CCA45B /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = /System/Library/Frameworks/WidgetKit.framework; sourceTree = "<absolute>"; };
+		9B9763EC30B2E91F00CCA45B /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };
+		9B9763FE30B2E94000CCA45B /* PowerNotchWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PowerNotchWidgetsExtension.entitlements; sourceTree = "<group>"; };
+		9B9763FF30B2E9B100CCA45B /* AIUsageWidgetBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageWidgetBridge.swift; sourceTree = "<group>"; };
+		9B97640530B2F04300CCA45B /* AIUsageHistoryCollector.swift */ = {isa = PBXFileReference; path = AIUsageHistoryCollector.swift; sourceTree = "<group>"; };
 		9BB15A1D30AEF17E00C7A364 /* ClosedNotchLyricView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClosedNotchLyricView.swift; sourceTree = "<group>"; };
 		B10348D82C74E56000475897 /* ConditionalModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionalModifier.swift; sourceTree = "<group>"; };
 		B10F84A22C6C9596009F3026 /* TestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestView.swift; sourceTree = "<group>"; };
@@ -323,11 +360,19 @@
 			);
 			target = 11F7484E2EC9AABA00F841DB /* PowerNotchXPCHelper */;
 		};
+		9B9763FC30B2E92100CCA45B /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9B9763E830B2E91F00CCA45B /* PowerNotchWidgetsExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		112FB72F2CCF12CC0015238C /* private */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = private; sourceTree = "<group>"; };
 		11F748502EC9AABA00F841DB /* PowerNotchXPCHelper */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (11F7485C2EC9AABA00F841DB /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = PowerNotchXPCHelper; sourceTree = "<group>"; };
+		9B9763EE30B2E92000CCA45B /* PowerNotchWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (9B9763FC30B2E92100CCA45B /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = PowerNotchWidgets; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -355,6 +400,15 @@
 				B19016222CC15B3D00E3F12E /* Defaults in Frameworks */,
 				111BE95D2ECD71E10079DD4E /* AsyncXPCConnection in Frameworks */,
 				B1628B922CC260C0003D8DF3 /* SwiftUIIntrospect in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9B9763E630B2E91F00CCA45B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9B9763ED30B2E91F00CCA45B /* SwiftUI.framework in Frameworks */,
+				9B9763EB30B2E91F00CCA45B /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -522,6 +576,8 @@
 				14C08BB52C8DE42D000F8AA0 /* CalendarManager.swift */,
 				B1F0A0012E60000100000001 /* BrightnessManager.swift */,
 				59D8C23B2E589FAA00147B33 /* VolumeManager.swift */,
+				9B9763D430B037CA00CCA45B /* AIUsageManager.swift */,
+				9B97640530B2F04300CCA45B /* AIUsageHistoryCollector.swift */,
 			);
 			path = managers;
 			sourceTree = "<group>";
@@ -545,9 +601,11 @@
 		14CEF4092C5CAED200855D72 = {
 			isa = PBXGroup;
 			children = (
+				9B9763FE30B2E94000CCA45B /* PowerNotchWidgetsExtension.entitlements */,
 				112B0EB62E30DD0F00562D6C /* mediaremote-adapter */,
 				14CEF4142C5CAED300855D72 /* powerNotch */,
 				11F748502EC9AABA00F841DB /* PowerNotchXPCHelper */,
+				9B9763EE30B2E92000CCA45B /* PowerNotchWidgets */,
 				14CEF4132C5CAED300855D72 /* Products */,
 				14D031EC2C689DB70096E6A1 /* Frameworks */,
 			);
@@ -558,6 +616,7 @@
 			children = (
 				14CEF4122C5CAED300855D72 /* powerNotch.app */,
 				11F7484F2EC9AABA00F841DB /* PowerNotchXPCHelper.xpc */,
+				9B9763E930B2E91F00CCA45B /* PowerNotchWidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -606,6 +665,8 @@
 				14D031EF2C689DC00096E6A1 /* ApplicationServices.framework */,
 				14D031ED2C689DB70096E6A1 /* IOKit.framework */,
 				112B0EBA2E30DD5000562D6C /* MediaRemoteAdapter.framework */,
+				9B9763EA30B2E91F00CCA45B /* WidgetKit.framework */,
+				9B9763EC30B2E91F00CCA45B /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -638,6 +699,8 @@
 				14D570C82C5F38890011E668 /* BoringViewModel.swift */,
 				14D570CA2C5F4B2C0011E668 /* BatteryStatusViewModel.swift */,
 				1153BD902D986DB300979FB0 /* PlaybackState.swift */,
+				9B9763D230B0373500CCA45B /* AIUsageModels.swift */,
+				9B9763FF30B2E9B100CCA45B /* AIUsageWidgetBridge.swift */,
 			);
 			path = models;
 			sourceTree = "<group>";
@@ -716,6 +779,7 @@
 				1471A8582C6281BD0058408D /* PowerNotchWindow.swift */,
 				9BB15A1D30AEF17E00C7A364 /* ClosedNotchLyricView.swift */,
 				9B9763D030B0178700CCA45B /* NotchCursorOcclusionView.swift */,
+				9B9763D630B0381A00CCA45B /* NotchAIUsageView.swift */,
 			);
 			path = Notch;
 			sourceTree = "<group>";
@@ -729,6 +793,7 @@
 				B1D6FD422C6603730015F173 /* SoftwareUpdater.swift */,
 				B1B112902C6A572100093D8F /* EditPanelView.swift */,
 				B1C448972C972CC4001F0858 /* ListItemPopover.swift */,
+				9B9763D830B0384300CCA45B /* AIUsageSettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -797,11 +862,13 @@
 				14CEF4102C5CAED300855D72 /* Resources */,
 				B1ECFA062C6FE58A002ACD87 /* Embed Frameworks */,
 				11F748412EC8051E00F841DB /* Embed XPC Services */,
+				9B9763F930B2E92100CCA45B /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				11F7485A2EC9AABA00F841DB /* PBXTargetDependency */,
+				9B9763F730B2E92100CCA45B /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				112FB72F2CCF12CC0015238C /* private */,
@@ -825,6 +892,28 @@
 			productReference = 14CEF4122C5CAED300855D72 /* powerNotch.app */;
 			productType = "com.apple.product-type.application";
 		};
+		9B9763E830B2E91F00CCA45B /* PowerNotchWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9B9763FD30B2E92100CCA45B /* Build configuration list for PBXNativeTarget "PowerNotchWidgetsExtension" */;
+			buildPhases = (
+				9B9763E530B2E91F00CCA45B /* Sources */,
+				9B9763E630B2E91F00CCA45B /* Frameworks */,
+				9B9763E730B2E91F00CCA45B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				9B9763EE30B2E92000CCA45B /* PowerNotchWidgets */,
+			);
+			name = PowerNotchWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = PowerNotchWidgetsExtension;
+			productReference = 9B9763E930B2E91F00CCA45B /* PowerNotchWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -832,7 +921,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1640;
+				LastSwiftUpdateCheck = 2720;
 				LastUpgradeCheck = 1640;
 				TargetAttributes = {
 					11F7484E2EC9AABA00F841DB = {
@@ -841,6 +930,9 @@
 					14CEF4112C5CAED300855D72 = {
 						CreatedOnToolsVersion = 15.4;
 						LastSwiftMigration = 1540;
+					};
+					9B9763E830B2E91F00CCA45B = {
+						CreatedOnToolsVersion = 27.2;
 					};
 				};
 			};
@@ -872,6 +964,7 @@
 			targets = (
 				14CEF4112C5CAED300855D72 /* powerNotch */,
 				11F7484E2EC9AABA00F841DB /* PowerNotchXPCHelper */,
+				9B9763E830B2E91F00CCA45B /* PowerNotchWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -897,6 +990,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9B9763E730B2E91F00CCA45B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -913,6 +1013,7 @@
 			files = (
 				115C12EC2ED3D003009754CA /* OpenNotchHUD.swift in Sources */,
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,
+				9B9763D330B0373500CCA45B /* AIUsageModels.swift in Sources */,
 				5955950D2E900ED800C66711 /* ApplicationRelauncher.swift in Sources */,
 				1100292A2E8691B400035A57 /* FileShareView.swift in Sources */,
 				147163982C5D35B70068B555 /* MusicVisualizer.swift in Sources */,
@@ -982,11 +1083,14 @@
 				B1CE8CFE2C6F659400DD9871 /* KeyboardShortcutsHelper.swift in Sources */,
 				14D570C62C5F38210011E668 /* BoringHeader.swift in Sources */,
 				B17266E32C65F7FB0031BA0D /* WhatsNewView.swift in Sources */,
+				9B9763D730B0381A00CCA45B /* NotchAIUsageView.swift in Sources */,
+				9B97640030B2E9B100CCA45B /* AIUsageWidgetBridge.swift in Sources */,
 				14C08BB62C8DE42D000F8AA0 /* CalendarManager.swift in Sources */,
 				14D570CD2C5F4BB70011E668 /* BoringBattery.swift in Sources */,
 				B10F84A32C6C9596009F3026 /* TestView.swift in Sources */,
 				1443E7F32C609DCE0027C1FC /* matters.swift in Sources */,
 				11C5E3162DFE88510065821E /* SettingsView.swift in Sources */,
+				9B97640630B2F04300CCA45B /* AIUsageHistoryCollector.swift in Sources */,
 				1153BD932D986E4300979FB0 /* AppleMusicController.swift in Sources */,
 				11C5E3132DFE85970065821E /* SettingsWindowController.swift in Sources */,
 				110029272E84FD4C00035A57 /* TemporaryFileStorageService.swift in Sources */,
@@ -1014,12 +1118,14 @@
 				11F748842ECB27DC00F841DB /* MusicSlotConfigurationView.swift in Sources */,
 				9A0887352C7AFF8E00C160EA /* TabSelectionView.swift in Sources */,
 				112FB7352CCF16F70015238C /* NotchSpaceManager.swift in Sources */,
+				9B9763D530B037CA00CCA45B /* AIUsageManager.swift in Sources */,
 				14FC6E502C7DED5600C7BEA5 /* DataTypes+Extensions.swift in Sources */,
 				1153BD982D9881F900979FB0 /* AppleScriptHelper.swift in Sources */,
 				11CFC6612E097F6800748C80 /* PermissionsRequestView.swift in Sources */,
 				14D570D22C5F6C6A0011E668 /* BoringExtrasMenu.swift in Sources */,
 				11D58EA22E760AE100FA8377 /* ImageService.swift in Sources */,
 				11F748822ECB07A400F841DB /* MusicControlButton.swift in Sources */,
+				9B9763D930B0384300CCA45B /* AIUsageSettingsView.swift in Sources */,
 				14288DDC2C6E015000B9F80C /* AudioPlayer.swift in Sources */,
 				149E0B972C737D00006418B1 /* WebcamManager.swift in Sources */,
 				14288E0C2C6F8EC000B9F80C /* AppIcons.swift in Sources */,
@@ -1031,6 +1137,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9B9763E530B2E91F00CCA45B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -1038,6 +1151,11 @@
 			isa = PBXTargetDependency;
 			target = 11F7484E2EC9AABA00F841DB /* PowerNotchXPCHelper */;
 			targetProxy = 11F748592EC9AABA00F841DB /* PBXContainerItemProxy */;
+		};
+		9B9763F730B2E92100CCA45B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9B9763E830B2E91F00CCA45B /* PowerNotchWidgetsExtension */;
+			targetProxy = 9B9763F630B2E92100CCA45B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1047,11 +1165,10 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PowerNotchXPCHelper/PowerNotchXPCHelper.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 271;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 877W5ZP5WY;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PowerNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PowerNotchXPCHelper;
@@ -1072,11 +1189,10 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PowerNotchXPCHelper/PowerNotchXPCHelper.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 271;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 877W5ZP5WY;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PowerNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PowerNotchXPCHelper;
@@ -1226,13 +1342,12 @@
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = powerNotch/powerNotch.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 271;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"powerNotch/Preview Content\"";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 877W5ZP5WY;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1261,6 +1376,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app;
 				PRODUCT_NAME = powerNotch;
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = targeted;
 				SWIFT_VERSION = 5.0;
@@ -1281,13 +1397,12 @@
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = powerNotch/powerNotch.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 271;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"powerNotch/Preview Content\"";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 877W5ZP5WY;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -1315,6 +1430,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app;
 				PRODUCT_NAME = powerNotch;
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = targeted;
 				SWIFT_VERSION = 5.0;
@@ -1322,6 +1438,94 @@
 					"$(inherited)",
 					"$(SDKROOT)/System/Library/PrivateFrameworks",
 				);
+			};
+			name = Release;
+		};
+		9B9763FA30B2E92100CCA45B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = PowerNotchWidgetsExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 271;
+				DEVELOPMENT_TEAM = 877W5ZP5WY;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PowerNotchWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PowerNotchWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 2.7.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 27.2;
+			};
+			name = Debug;
+		};
+		9B9763FB30B2E92100CCA45B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = PowerNotchWidgetsExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 271;
+				DEVELOPMENT_TEAM = 877W5ZP5WY;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PowerNotchWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PowerNotchWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 2.7.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 27.2;
 			};
 			name = Release;
 		};
@@ -1351,6 +1555,15 @@
 			buildConfigurations = (
 				14CEF4222C5CAED400855D72 /* Debug */,
 				14CEF4232C5CAED400855D72 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9B9763FD30B2E92100CCA45B /* Build configuration list for PBXNativeTarget "PowerNotchWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9B9763FA30B2E92100CCA45B /* Debug */,
+				9B9763FB30B2E92100CCA45B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

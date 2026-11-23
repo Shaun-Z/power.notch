@@ -9,25 +9,36 @@ import Defaults
 import SwiftUI
 
 struct TabModel: Identifiable {
-    let id = UUID()
+    var id: NotchViews { view }
     let label: String
     let icon: String
     let view: NotchViews
 }
 
-let tabs = [
-    TabModel(label: "Home", icon: "house.fill", view: .home),
-    TabModel(label: "Shelf", icon: "tray.fill", view: .shelf)
-]
-
 struct TabSelectionView: View {
     @ObservedObject var coordinator = BoringViewCoordinator.shared
+    @ObservedObject var tvm = ShelfStateViewModel.shared
     @Default(.liquidGlassNotch) private var liquidGlassNotch
+    @Default(.boringShelf) private var boringShelf
+    @Default(.enableAIUsageNotchTab) private var enableAIUsageNotchTab
     @Namespace private var animation
+
+    private var availableTabs: [TabModel] {
+        var result: [TabModel] = [
+            TabModel(label: "Home", icon: "house.fill", view: .home)
+        ]
+        if (!tvm.isEmpty || coordinator.alwaysShowTabs) && boringShelf {
+            result.append(TabModel(label: "Shelf", icon: "tray.fill", view: .shelf))
+        }
+        if enableAIUsageNotchTab {
+            result.append(TabModel(label: "AI Usage", icon: "chart.bar.xaxis", view: .aiUsage))
+        }
+        return result
+    }
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(tabs) { tab in
+            ForEach(availableTabs) { tab in
                 let isSelected = coordinator.currentView == tab.view
                 TabButton(
                     label: tab.label,
@@ -55,6 +66,11 @@ struct TabSelectionView: View {
             isHovering: false,
             isInteractive: false
         )
+        .onChange(of: enableAIUsageNotchTab) { _, enabled in
+            if !enabled && coordinator.currentView == .aiUsage {
+                coordinator.currentView = .home
+            }
+        }
     }
 
     @ViewBuilder

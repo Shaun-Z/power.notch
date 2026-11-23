@@ -7,8 +7,8 @@
 import SwiftUI
 
 /// Shared motion timing constants and curves synchronizing the notch expansion,
-/// album-art thumbnail `matchedGeometryEffect`, unified lyric flight, and the
-/// post-flight song title & artist reveal so every element arrives on the exact same frame.
+/// album-art thumbnail `matchedGeometryEffect`, and unified lyric flight so every
+/// element arrives on the exact same frame.
 enum NotchLyricMotion {
     static let openFlightDuration: Double = 0.38
     static let closeFlightDuration: Double = 0.36
@@ -39,24 +39,37 @@ struct NotchLyricAnchorKey: PreferenceKey {
     }
 }
 
+private enum NotchLyricDisplayMode: Equatable {
+    case closed
+    case openHome
+    case openBottomEdge
+}
+
 /// Single continuously-mounted lyric view rendered in the fixed `windowSize` overlay of
-/// `ContentView`, smoothly translating between the closed-notch strip below the notch and
-/// the expanded-notch slot beneath the artist name with zero overshoot.
+/// `ContentView`, smoothly translating between the closed-notch strip below the notch,
+/// the expanded-notch bottom edge (when on non-Home tabs), and the expanded-notch slot
+/// beneath the artist name (when on the Home tab) with zero overshoot.
 struct NotchUnifiedLyricOverlay: View {
     @ObservedObject var musicManager = MusicManager.shared
 
     let anchors: NotchLyricAnchors
     let proxy: GeometryProxy
     let isOpen: Bool
+    let isHomeTab: Bool
     let showClosedLyrics: Bool
     let showOpenLyrics: Bool
+    let showBottomEdgeOpenLyrics: Bool
     let isLiquidGlass: Bool
     let gestureProgress: CGFloat
+    var isClosedInlineInNotch: Bool = false
 
     @State private var settledClosedRect: CGRect = .zero
     @State private var settledOpenRect: CGRect = .zero
+    @State private var lastValidRect: CGRect = .zero
     @State private var settledIsOpen: Bool = false
     @State private var isTransitioning: Bool = false
+    @State private var lastTransitionWasTabSwitch: Bool = false
+    @State private var hasMounted: Bool = false
     @State private var transitionResetTask: Task<Void, Never>?
     @State private var wasVisible: Bool = false
     @State private var measuredTextWidth: CGFloat = 0
@@ -66,13 +79,23 @@ struct NotchUnifiedLyricOverlay: View {
 
     private let openAnimation = NotchLyricMotion.openAnimation
     private let closeAnimation = NotchLyricMotion.closeAnimation
+    private let tabSwitchAnimation = Animation.spring(response: 0.30, dampingFraction: 0.82)
+
+    private var displayMode: NotchLyricDisplayMode {
+        guard isOpen else { return .closed }
+        return isHomeTab ? .openHome : .openBottomEdge
+    }
+
+    private var isInlineOpen: Bool {
+        displayMode == .openHome
+    }
 
     private var currentClosedRect: CGRect? {
         guard showClosedLyrics, let anchor = anchors.closed else { return nil }
         let raw = proxy[anchor]
         guard raw.width > 0, raw.height > 0 else { return nil }
-        // Inset horizontally in closed mode so text keeps 12pt breathing room on each side.
-        return raw.insetBy(dx: 12, dy: 0)
+        // Inset horizontally in closed mode so text keeps comfortable breathing room on each side.
+        return raw.insetBy(dx: isClosedInlineInNotch ? 4 : 12, dy: 0)
     }
 
     private var currentOpenRect: CGRect? {
@@ -82,8 +105,15 @@ struct NotchUnifiedLyricOverlay: View {
         return raw
     }
 
-    private var activeRect: CGRect? {
-        isOpen ? currentOpenRect : currentClosedRect
+    private var openBottomEdgeRect: CGRect {
+        let width = max(120, openNotchSize.width - 112)
+        let height: CGFloat = 20
+        return CGRect(
+            x: (proxy.size.width - width) / 2,
+            y: openNotchSize.height,
+            width: width,
+            height: height
+        )
     }
 
     private var isInFlight: Bool {
@@ -91,7 +121,14 @@ struct NotchUnifiedLyricOverlay: View {
     }
 
     private var isVisible: Bool {
-        isOpen ? (showOpenLyrics && musicManager.isPlaying) : showClosedLyrics
+        switch displayMode {
+        case .closed:
+            return showClosedLyrics
+        case .openHome:
+            return showOpenLyrics && musicManager.isPlaying
+        case .openBottomEdge:
+            return showBottomEdgeOpenLyrics
+        }
     }
 
     private var closedLyricColor: Color {
@@ -105,46 +142,67 @@ struct NotchUnifiedLyricOverlay: View {
         return isLiquidGlass ? Color.white.opacity(0.68) : Color.gray
     }
 
+    private var activeFlightAnimation: Animation? {
+        guard hasMounted && (wasVisible || isVisible) else { return nil }
+        if isOpen != settledIsOpen {
+            return isOpen ? openAnimation : closeAnimation
+        }
+        if lastTransitionWasTabSwitch {
+            return tabSwitchAnimation
+        }
+        return isOpen ? openAnimation : closeAnimation
+    }
+
     var body: some View {
         // Lock endpoints to settled rects during open/close transitions (including frame 0)
         // in the static `windowSize` coordinate space so container resizing never drags the
         // target mid-flight and produces overshoot.
         let inFlight = isInFlight
-        let startRect: CGRect = {
+        let closedRect: CGRect = {
             if inFlight && settledClosedRect.width > 0 {
                 return settledClosedRect
             }
             return currentClosedRect ?? settledClosedRect
         }()
-        let endRect: CGRect = {
+        let openHomeRect: CGRect = {
             if inFlight && settledOpenRect.width > 0 {
                 return settledOpenRect
             }
             return currentOpenRect ?? settledOpenRect
         }()
-        let hasBothEndpoints = startRect.width > 0 && startRect.height > 0
-            && endRect.width > 0 && endRect.height > 0
-        let fallbackRect = activeRect ?? (isOpen ? endRect : startRect)
-        let effectiveStart = hasBothEndpoints ? startRect : fallbackRect
-        let effectiveEnd = hasBothEndpoints ? endRect : fallbackRect
-        let targetProgress: CGFloat = (isOpen && endRect.width > 0) ? 1.0 : 0.0
-        let shouldAnimateFlight = hasBothEndpoints && (wasVisible || isVisible)
+        let targetRect: CGRect = {
+            switch displayMode {
+            case .closed:
+                if closedRect.width > 0 && closedRect.height > 0 {
+                    return closedRect
+                }
+                return lastValidRect
+            case .openHome:
+                if openHomeRect.width > 0 && openHomeRect.height > 0 {
+                    return openHomeRect
+                }
+                return lastValidRect.width > 0 ? lastValidRect : openBottomEdgeRect
+            case .openBottomEdge:
+                return openBottomEdgeRect
+            }
+        }()
+        let targetInlineProgress: CGFloat = isInlineOpen ? 1.0 : 0.0
+        let flightAnim = activeFlightAnimation
 
         Group {
-            if effectiveStart.width > 0 && effectiveStart.height > 0 {
+            if targetRect.width > 0 && targetRect.height > 0 {
                 TimelineView(.periodic(from: .now, by: 0.1)) { timeline in
                     let line = currentLyricLine(at: timeline.date)
                     let isPersian = containsPersianCharacters(line)
                     let font: Font = isPersian
                         ? .custom("Vazirmatn-Regular", size: NSFont.preferredFont(forTextStyle: .subheadline).pointSize)
                         : .subheadline
-                    let activeContainerWidth = isOpen ? effectiveEnd.width : effectiveStart.width
-                    let needsMarquee = isOpen && measuredTextWidth > effectiveEnd.width + 2
+                    let activeContainerWidth = targetRect.width
+                    let needsMarquee = isInlineOpen && measuredTextWidth > activeContainerWidth + 2
 
                     NotchLyricFlightView(
-                        progress: targetProgress,
-                        startRect: effectiveStart,
-                        endRect: effectiveEnd,
+                        rect: targetRect,
+                        inlineProgress: targetInlineProgress,
                         measuredTextWidth: measuredTextWidth,
                         needsMarquee: needsMarquee,
                         marqueeOffset: marqueeOffset
@@ -159,7 +217,8 @@ struct NotchUnifiedLyricOverlay: View {
                                 }
                         }
                     }
-                    .animation(shouldAnimateFlight ? (isOpen ? openAnimation : closeAnimation) : nil, value: targetProgress)
+                    .animation(flightAnim, value: targetRect)
+                    .animation(flightAnim, value: targetInlineProgress)
                     .background {
                         // Measure single-line natural width without affecting layout
                         Text(line)
@@ -179,7 +238,7 @@ struct NotchUnifiedLyricOverlay: View {
                                         .onChange(of: line) { _, newLine in
                                             updateMeasuredWidth(textGeo.size.width, line: newLine, containerWidth: activeContainerWidth)
                                         }
-                                        .onChange(of: isOpen) { _, _ in
+                                        .onChange(of: isInlineOpen) { _, _ in
                                             updateMeasuredWidth(textGeo.size.width, line: line, containerWidth: activeContainerWidth)
                                         }
                                 }
@@ -193,14 +252,26 @@ struct NotchUnifiedLyricOverlay: View {
                             : 0.0
                     )
                 }
+                .onChange(of: targetRect) { _, newRect in
+                    if newRect.width > 0 && newRect.height > 0 {
+                        lastValidRect = newRect
+                    }
+                }
                 .onChange(of: isOpen) { _, _ in
+                    lastTransitionWasTabSwitch = false
                     beginTransitionWindow()
+                }
+                .onChange(of: isHomeTab) { _, _ in
+                    guard isOpen else { return }
+                    lastTransitionWasTabSwitch = true
+                    beginTransitionWindow(duration: 0.34)
                 }
                 .onChange(of: isTransitioning) { _, transitioning in
                     guard !transitioning else { return }
                     settledIsOpen = isOpen
+                    lastTransitionWasTabSwitch = false
                     if isOpen {
-                        if let rect = currentOpenRect {
+                        if isHomeTab, let rect = currentOpenRect {
                             settledOpenRect = rect
                         }
                     } else {
@@ -209,6 +280,12 @@ struct NotchUnifiedLyricOverlay: View {
                         } else if !showClosedLyrics {
                             settledClosedRect = .zero
                         }
+                    }
+                    wasVisible = isVisible
+                }
+                .onChange(of: showBottomEdgeOpenLyrics) { _, _ in
+                    if !isInFlight {
+                        wasVisible = isVisible
                     }
                 }
                 .onChange(of: currentClosedRect) { _, newRect in
@@ -224,7 +301,7 @@ struct NotchUnifiedLyricOverlay: View {
                     wasVisible = isVisible
                 }
                 .onChange(of: currentOpenRect) { _, newRect in
-                    if !isInFlight && isOpen, let newRect {
+                    if !isInFlight && isOpen && isHomeTab, let newRect {
                         settledOpenRect = newRect
                     }
                     wasVisible = isVisible
@@ -237,23 +314,29 @@ struct NotchUnifiedLyricOverlay: View {
                     if let rect = currentOpenRect {
                         settledOpenRect = rect
                     }
+                    if targetRect.width > 0 && targetRect.height > 0 {
+                        lastValidRect = targetRect
+                    }
                     wasVisible = isVisible
+                    hasMounted = true
                 }
                 .onDisappear {
                     transitionResetTask?.cancel()
                     transitionResetTask = nil
                     marqueeTask?.cancel()
                     marqueeTask = nil
+                    hasMounted = false
                 }
             }
         }
         .allowsHitTesting(false)
     }
 
-    private func beginTransitionWindow() {
+    private func beginTransitionWindow(duration: Double? = nil) {
         isTransitioning = true
         transitionResetTask?.cancel()
-        let settleMs = Int((max(NotchLyricMotion.openFlightDuration, NotchLyricMotion.closeFlightDuration) * 1000).rounded()) + 30
+        let flightDuration = duration ?? max(NotchLyricMotion.openFlightDuration, NotchLyricMotion.closeFlightDuration)
+        let settleMs = Int((flightDuration * 1000).rounded()) + 30
         transitionResetTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(settleMs))
             guard !Task.isCancelled else { return }
@@ -267,8 +350,8 @@ struct NotchUnifiedLyricOverlay: View {
     private func lyricTextView(line: String, font: Font, needsMarquee: Bool) -> some View {
         Text(line)
             .font(font)
-            .foregroundColor(isOpen ? openLyricColor : closedLyricColor)
-            .animation(.easeOut(duration: 0.24), value: isOpen)
+            .foregroundColor(isInlineOpen ? openLyricColor : closedLyricColor)
+            .animation(.easeOut(duration: 0.24), value: isInlineOpen)
             .lineLimit(1)
             .truncationMode(.tail)
             .fixedSize(horizontal: needsMarquee, vertical: false)
@@ -282,7 +365,7 @@ struct NotchUnifiedLyricOverlay: View {
         marqueeTask?.cancel()
         marqueeTask = nil
 
-        let shouldScroll = isOpen && width > containerWidth + 2 && !line.isEmpty
+        let shouldScroll = isInlineOpen && width > containerWidth + 2 && !line.isEmpty
         guard shouldScroll else {
             withAnimation(.easeOut(duration: 0.2)) {
                 marqueeOffset = 0
@@ -308,7 +391,7 @@ struct NotchUnifiedLyricOverlay: View {
 
     private func currentLyricLine(at date: Date) -> String {
         if musicManager.isFetchingLyrics {
-            return isOpen ? "Loading lyrics…" : ""
+            return isInlineOpen ? "Loading lyrics…" : ""
         }
         if !musicManager.syncedLyrics.isEmpty {
             let elapsed = musicManager.estimatedPlaybackPosition(at: date)
@@ -316,7 +399,7 @@ struct NotchUnifiedLyricOverlay: View {
         }
         let plain = plainLyricLine(at: date)
         if plain.isEmpty {
-            return isOpen ? "No lyrics found" : ""
+            return isInlineOpen ? "No lyrics found" : ""
         }
         return plain
     }
@@ -342,58 +425,72 @@ struct NotchUnifiedLyricOverlay: View {
 
 /// Pure `Animatable` flight container for the unified lyric view.
 /// Smoothly interpolates position, clipping frame, shadow strength, and horizontal text
-/// alignment (centered in the closed-notch strip → leading-aligned under the artist name)
-/// with zero overshoot.
+/// alignment (centered below the notch ↔ leading-aligned under the artist name) with zero overshoot.
 private struct NotchLyricFlightView<Content: View>: View, Animatable {
-    var progress: CGFloat
-    let startRect: CGRect
-    let endRect: CGRect
+    var midX: CGFloat
+    var midY: CGFloat
+    var boxWidth: CGFloat
+    var boxHeight: CGFloat
+    var inlineProgress: CGFloat
     let measuredTextWidth: CGFloat
     let needsMarquee: Bool
     let marqueeOffset: CGFloat
     let content: Content
 
     init(
-        progress: CGFloat,
-        startRect: CGRect,
-        endRect: CGRect,
+        rect: CGRect,
+        inlineProgress: CGFloat,
         measuredTextWidth: CGFloat,
         needsMarquee: Bool,
         marqueeOffset: CGFloat,
         @ViewBuilder content: () -> Content
     ) {
-        self.progress = progress
-        self.startRect = startRect
-        self.endRect = endRect
+        self.midX = rect.midX
+        self.midY = rect.midY
+        self.boxWidth = rect.width
+        self.boxHeight = rect.height
+        self.inlineProgress = inlineProgress
         self.measuredTextWidth = measuredTextWidth
         self.needsMarquee = needsMarquee
         self.marqueeOffset = marqueeOffset
         self.content = content()
     }
 
-    var animatableData: CGFloat {
-        get { progress }
-        set { progress = newValue }
+    var animatableData: AnimatablePair<
+        AnimatablePair<CGFloat, CGFloat>,
+        AnimatablePair<AnimatablePair<CGFloat, CGFloat>, CGFloat>
+    > {
+        get {
+            AnimatablePair(
+                AnimatablePair(midX, midY),
+                AnimatablePair(AnimatablePair(boxWidth, boxHeight), inlineProgress)
+            )
+        }
+        set {
+            midX = newValue.first.first
+            midY = newValue.first.second
+            boxWidth = newValue.second.first.first
+            boxHeight = newValue.second.first.second
+            inlineProgress = newValue.second.second
+        }
     }
 
     var body: some View {
-        let p = max(0.0, min(1.0, progress))
-        let boxWidth = startRect.width + (endRect.width - startRect.width) * p
-        let boxHeight = startRect.height + (endRect.height - startRect.height) * p
-        let posX = startRect.midX + (endRect.midX - startRect.midX) * p
-        let posY = startRect.midY + (endRect.midY - startRect.midY) * p
+        let p = max(0.0, min(1.0, inlineProgress))
+        let clampedWidth = max(1, boxWidth)
+        let clampedHeight = max(1, boxHeight)
 
-        // Smoothly interpolate horizontal alignment from centered (closed) to leading (open)
-        let closedTextOffsetX = measuredTextWidth > 0
-            ? max(0.0, (startRect.width - measuredTextWidth) / 2.0)
+        // Smoothly interpolate horizontal alignment between centered (closed / bottom edge) and leading (open Home)
+        let centeredTextOffsetX = measuredTextWidth > 0
+            ? max(0.0, (clampedWidth - measuredTextWidth) / 2.0)
             : 0.0
-        let openTextOffsetX = needsMarquee ? marqueeOffset : 0.0
-        let textOffsetX = closedTextOffsetX * (1.0 - p) + openTextOffsetX * p
+        let inlineTextOffsetX = needsMarquee ? marqueeOffset : 0.0
+        let textOffsetX = centeredTextOffsetX * (1.0 - p) + inlineTextOffsetX * p
         let closedShadowStrength = Double(1.0 - p)
 
         content
             .offset(x: textOffsetX)
-            .frame(width: max(1, boxWidth), height: max(1, boxHeight), alignment: .leading)
+            .frame(width: clampedWidth, height: clampedHeight, alignment: .leading)
             .clipped()
             .shadow(
                 color: .black.opacity(0.8 * closedShadowStrength),
@@ -407,7 +504,7 @@ private struct NotchLyricFlightView<Content: View>: View, Animatable {
                 x: 0,
                 y: 0
             )
-            .position(x: posX, y: posY)
+            .position(x: midX, y: midY)
     }
 }
 

@@ -241,10 +241,75 @@ final class XPCHelperClient: NSObject {
             return false
         }
     }
+
+    // MARK: - Antigravity CLI Probe
+
+    nonisolated func runAntigravityUsageProbe() async -> String? {
+        do {
+            let service = await MainActor.run {
+                ensureRemoteService()
+            }
+            return try await service.withContinuation { service, continuation in
+                service.runAntigravityUsageProbe { output in
+                    continuation.resume(returning: output)
+                }
+            }
+        } catch {
+            return nil
+        }
+    }
+
+    // MARK: - Apple Music Local TTML Cache
+
+    nonisolated func fetchAppleMusicCachedTTML(
+        title: String,
+        artist: String,
+        album: String,
+        duration: Double
+    ) async -> String? {
+        do {
+            let service = await MainActor.run {
+                ensureRemoteService()
+            }
+            return try await service.withContinuation { service, continuation in
+                service.fetchAppleMusicCachedTTML(
+                    title: title,
+                    artist: artist,
+                    album: album,
+                    duration: duration
+                ) { ttml in
+                    continuation.resume(returning: ttml)
+                }
+            }
+        } catch {
+            return nil
+        }
+    }
+
+    // MARK: - Codex Local Workspace Credit Snapshot
+
+    nonisolated func fetchCodexLocalCreditSnapshot(
+        accountId: String,
+        email: String
+    ) async -> String? {
+        do {
+            let service = await MainActor.run {
+                ensureRemoteService()
+            }
+            return try await service.withContinuation { service, continuation in
+                service.fetchCodexLocalCreditSnapshot(
+                    accountId: accountId,
+                    email: email
+                ) { json in
+                    continuation.resume(returning: json)
+                }
+            }
+        } catch {
+            return nil
+        }
+    }
 }
 
 extension Notification.Name {
     static let accessibilityAuthorizationChanged = Notification.Name("accessibilityAuthorizationChanged")
 }
-
-

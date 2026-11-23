@@ -104,6 +104,7 @@ extension Defaults.Keys {
     static let enableShadow = Key<Bool>("enableShadow", default: true)
     static let cornerRadiusScaling = Key<Bool>("cornerRadiusScaling", default: true)
     static let liquidGlassNotch = Key<Bool>("liquidGlassNotch", default: true)
+    static let dynamicIslandShape = Key<Bool>("dynamicIslandShape", default: false)
 
     static let showNotHumanFace = Key<Bool>("showNotHumanFace", default: false)
     static let tileShowLabels = Key<Bool>("tileShowLabels", default: false)
@@ -200,4 +201,18 @@ extension Defaults.Keys {
     }
 
     static let didClearLegacyURLCacheV1 = Key<Bool>("didClearLegacyURLCache_v1", default: false)
+
+    // MARK: AI Usage Monitor
+    static let enableAIUsageNotchTab = Key<Bool>("enableAIUsageNotchTab", default: true)
+    static let aiUsageRefreshInterval = Key<Int>("aiUsageRefreshInterval", default: 300)
+    static let aiUsageShowRemainingPercent = Key<Bool>("aiUsageShowRemainingPercent", default: false)
+    static let aiUsageHideAccountEmails = Key<Bool>("aiUsageHideAccountEmails", default: false)
+    static let aiUsageAllowExternalKeychain = Key<Bool>("aiUsageAllowExternalKeychain", default: false)
+    static let aiUsageEnabledProviders = Key<[String]>(
+        "aiUsageEnabledProviders",
+        default: ["codex", "claude", "antigravity", "copilot", "cursor", "opencode", "mimo"]
+    )
+    static let aiUsagePinnedRingID = Key<String>("aiUsagePinnedRingID", default: "")
+    static let aiUsageProviderConfigsData = Key<Data?>("aiUsageProviderConfigsData", default: nil)
+    static let aiUsageCachedSnapshotsData = Key<Data?>("aiUsageCachedSnapshotsData", default: nil)
 }

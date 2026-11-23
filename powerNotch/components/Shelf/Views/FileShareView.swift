@@ -39,14 +39,16 @@ struct FileShareView: View {
             }
     }
 
+    private let dropAreaCornerRadius: CGFloat = 14
+
     private var dropArea: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: dropAreaCornerRadius, style: .continuous)
                 .fill(
                     LinearGradient(colors: [Color.black.opacity(0.35), Color.black.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: dropAreaCornerRadius, style: .continuous)
                         .stroke(
                             vm.dropZoneTargeting
                                 ? Color.accentColor.opacity(0.9)
@@ -93,7 +95,7 @@ struct FileShareView: View {
             
             // Loading overlay
             if isProcessing || quickShare.isPickerOpen {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: dropAreaCornerRadius, style: .continuous)
                     .fill(.black.opacity(0.3))
                     .overlay(
                         ProgressView()
@@ -102,7 +104,7 @@ struct FileShareView: View {
                     )
             }
         }
-        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: dropAreaCornerRadius, style: .continuous))
     }
 
     // MARK: - Actions

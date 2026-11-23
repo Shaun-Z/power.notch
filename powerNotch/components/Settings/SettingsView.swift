@@ -51,6 +51,9 @@ struct SettingsView: View {
                 NavigationLink(value: "Shelf") {
                     Label("Shelf", systemImage: "books.vertical")
                 }
+                NavigationLink(value: "AI Usage") {
+                    Label("AI Usage", systemImage: "chart.bar.xaxis")
+                }
                 NavigationLink(value: "Shortcuts") {
                     Label("Shortcuts", systemImage: "keyboard")
                 }
@@ -85,6 +88,8 @@ struct SettingsView: View {
                     Charge()
                 case "Shelf":
                     Shelf()
+                case "AI Usage":
+                    AIUsageSettingsView()
                 case "Shortcuts":
                     Shortcuts()
                 case "Extensions":
@@ -1566,6 +1571,14 @@ struct Advanced: View {
                 }
                 Defaults.Toggle(key: .liquidGlassNotch) {
                     Text("Liquid Glass expanded notch")
+                }
+                Defaults.Toggle(key: .dynamicIslandShape) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Dynamic Island expanded shape")
+                        Text("Morph expanded wings and card into a rounded Dynamic Island contour matching inner corners")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             } header: {
                 Text("Window Appearance")

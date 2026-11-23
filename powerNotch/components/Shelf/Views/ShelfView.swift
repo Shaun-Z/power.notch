@@ -59,7 +59,7 @@ struct ShelfView: View {
     }
 
     var panel: some View {
-        RoundedRectangle(cornerRadius: 16)
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
             .stroke(
                 vm.dragDetectorTargeting
                     ? Color.accentColor.opacity(0.9)
