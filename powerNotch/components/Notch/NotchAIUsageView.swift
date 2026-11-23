@@ -648,7 +648,8 @@ private struct NotchAIProviderCompactCard: View {
     }
 }
 
-/// Compact AI Usage ring gauge displayed in the closed-notch right wing when the AI Usage tab is enabled.
+/// Compact AI Usage ring gauge with centered provider logo displayed in the closed-notch right wing
+/// when the AI Usage tab is enabled.
 struct ClosedNotchAIUsageRingView: View {
     @ObservedObject private var usageManager = AIUsageManager.shared
     @Default(.aiUsagePinnedRingID) private var pinnedRingID
@@ -657,23 +658,37 @@ struct ClosedNotchAIUsageRingView: View {
 
     let containerSide: CGFloat
 
-    private var ringSize: CGFloat {
-        if containerSide <= 18 {
-            return max(13, containerSide - 1)
-        }
-        return min(containerSide - 2, 22)
-    }
-
     private var outerLineWidth: CGFloat {
-        ringSize <= 16 ? 2.0 : 2.35
+        if containerSide <= 18 {
+            return max(1.15, min(1.55, containerSide * 0.095))
+        }
+        return min(2.6, max(1.75, containerSide * 0.082))
     }
 
     private var innerLineWidth: CGFloat {
-        ringSize <= 16 ? 1.7 : 2.0
+        max(1.0, outerLineWidth * 0.85)
     }
 
     private var ringGap: CGFloat {
-        ringSize <= 16 ? 1.15 : 1.45
+        min(1.4, max(0.55, containerSide * 0.04))
+    }
+
+    /// Ring stroke centerline diameter sized so the outer edge (`ringSize + outerLineWidth`)
+    /// sits flush inside `containerSide`, matching the left album art thumbnail at any island
+    /// height while leaving clean breathing room for the centered provider logo.
+    private var ringSize: CGFloat {
+        max(8, containerSide - outerLineWidth)
+    }
+
+    private var dualCenterIconSize: CGFloat {
+        let innerSize = max(5, ringSize - (outerLineWidth + ringGap) * 2)
+        let innerHoleDiameter = max(0, innerSize - innerLineWidth)
+        return max(4.5, innerHoleDiameter * 0.62)
+    }
+
+    private var singleCenterIconSize: CGFloat {
+        let innerHoleDiameter = max(0, ringSize - outerLineWidth)
+        return max(5.5, innerHoleDiameter * 0.56)
     }
 
     var body: some View {
@@ -684,6 +699,7 @@ struct ClosedNotchAIUsageRingView: View {
                     ? resolved.group.outerWindow.remainingPercent
                     : resolved.group.outerWindow.clampedUsedPercent
                 let outerCol = resolved.provider.outerRingColor(for: resolved.group.outerWindow)
+                let iconAccent = resolved.provider.accentColor
 
                 if let inner = resolved.group.innerWindow {
                     let innerPct = showRemainingPercent
@@ -691,77 +707,52 @@ struct ClosedNotchAIUsageRingView: View {
                         : inner.clampedUsedPercent
                     let innerCol = resolved.provider.innerRingColor(for: inner)
 
-                    AIUsageDualRingGauge(
-                        outerProgress: outerPct / 100.0,
-                        innerProgress: innerPct / 100.0,
-                        outerColor: outerCol,
-                        innerColor: innerCol,
-                        size: ringSize,
-                        outerLineWidth: outerLineWidth,
-                        innerLineWidth: innerLineWidth,
-                        ringGap: ringGap,
-                        outerTrackColor: Color.white.opacity(0.18),
-                        innerTrackColor: Color.white.opacity(0.14)
-                    )
+                    ZStack {
+                        AIUsageDualRingGauge(
+                            outerProgress: outerPct / 100.0,
+                            innerProgress: innerPct / 100.0,
+                            outerColor: outerCol,
+                            innerColor: innerCol,
+                            size: ringSize,
+                            outerLineWidth: outerLineWidth,
+                            innerLineWidth: innerLineWidth,
+                            ringGap: ringGap,
+                            outerTrackColor: Color.white.opacity(0.18),
+                            innerTrackColor: Color.white.opacity(0.14)
+                        )
+
+                        AIProviderIconView(provider: resolved.provider, size: dualCenterIconSize)
+                            .foregroundStyle(iconAccent)
+                            .shadow(color: .black.opacity(0.45), radius: 1, x: 0, y: 0.5)
+                    }
                 } else {
-                    AIUsageSingleRingGauge(
-                        progress: outerPct / 100.0,
-                        color: outerCol,
-                        centerLabel: nil,
-                        size: ringSize,
-                        lineWidth: outerLineWidth,
-                        trackColor: Color.white.opacity(0.18)
-                    )
+                    ZStack {
+                        AIUsageSingleRingGauge(
+                            progress: outerPct / 100.0,
+                            color: outerCol,
+                            centerLabel: nil,
+                            size: ringSize,
+                            lineWidth: outerLineWidth,
+                            trackColor: Color.white.opacity(0.18)
+                        )
+
+                        AIProviderIconView(provider: resolved.provider, size: singleCenterIconSize)
+                            .foregroundStyle(iconAccent)
+                            .shadow(color: .black.opacity(0.45), radius: 1, x: 0, y: 0.5)
+                    }
                 }
             } else {
-                Circle()
-                    .stroke(Color.white.opacity(0.22), lineWidth: outerLineWidth)
-                    .frame(width: ringSize, height: ringSize)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-    }
-}
-/// Compact AI provider icon displayed in the closed-notch left wing when media is idle.
-struct ClosedNotchAIUsageProviderIconView: View {
-    @ObservedObject private var usageManager = AIUsageManager.shared
-    @Default(.aiUsagePinnedRingID) private var pinnedRingID
-    @Default(.aiUsageEnabledProviders) private var enabledProvidersRaw
-
-    let containerSide: CGFloat
-
-    private var badgeSize: CGFloat {
-        // Match ClosedNotchAIUsageRingView.ringSize so left & right circular caps
-        // have identical diameter and concentric clearance inside the closed ends.
-        if containerSide <= 18 {
-            return max(13, containerSide - 1)
-        }
-        return min(containerSide - 2, 22)
-    }
-
-    var body: some View {
-        let _ = enabledProvidersRaw
-        let resolved = usageManager.resolvedPinnedRing(pinnedID: pinnedRingID)
-        let accent = resolved?.provider.accentColor ?? Color.effectiveAccent
-
-        ZStack {
-            Circle()
-                .fill(accent.opacity(0.22))
-                .overlay {
+                ZStack {
                     Circle()
-                        .strokeBorder(accent.opacity(0.45), lineWidth: 0.7)
-                }
+                        .stroke(Color.white.opacity(0.22), lineWidth: outerLineWidth)
+                        .frame(width: ringSize, height: ringSize)
 
-            if let provider = resolved?.provider {
-                AIProviderIconView(provider: provider, size: max(10, badgeSize * 0.56))
-                    .foregroundStyle(accent)
-            } else {
-                Image(systemName: "chart.bar.xaxis")
-                    .font(.system(size: max(8.5, badgeSize * 0.48), weight: .semibold))
-                    .foregroundStyle(accent)
+                    Image(systemName: "chart.bar.xaxis")
+                        .font(.system(size: max(6.5, singleCenterIconSize * 0.85), weight: .semibold))
+                        .foregroundStyle(Color.effectiveAccent)
+                }
             }
         }
-        .frame(width: badgeSize, height: badgeSize)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }
@@ -774,8 +765,16 @@ struct ClosedNotchAIUsageSummaryView: View {
     @Default(.aiUsageShowRemainingPercent) private var showRemainingPercent
     @Default(.aiUsageEnabledProviders) private var enabledProvidersRaw
 
+    var closedHeight: CGFloat? = nil
+
+    private var fontSize: CGFloat {
+        guard let closedHeight, closedHeight > 0 else { return 11 }
+        return min(14, max(8.5, closedHeight * 0.46))
+    }
+
     var body: some View {
         let _ = enabledProvidersRaw
+        let textSize = fontSize
         Group {
             if let resolved = usageManager.resolvedPinnedRing(pinnedID: pinnedRingID) {
                 let outerPct = showRemainingPercent
@@ -789,13 +788,13 @@ struct ClosedNotchAIUsageSummaryView: View {
 
                 HStack(spacing: 4) {
                     Text(titleText)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(.system(size: textSize, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.86))
                         .lineLimit(1)
                         .truncationMode(.tail)
 
                     Text("·")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: textSize, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.38))
 
                     if let inner = resolved.group.innerWindow {
@@ -812,11 +811,11 @@ struct ClosedNotchAIUsageSummaryView: View {
                             Text(String(format: "%.0f%%", innerPct))
                                 .foregroundStyle(innerCol)
                         }
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .font(.system(size: textSize, weight: .bold, design: .monospaced))
                         .lineLimit(1)
                     } else {
                         Text(String(format: "%.0f%%", outerPct))
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .font(.system(size: textSize, weight: .bold, design: .monospaced))
                             .foregroundStyle(outerCol)
                             .lineLimit(1)
                     }
@@ -826,7 +825,7 @@ struct ClosedNotchAIUsageSummaryView: View {
                 .shadow(color: .black.opacity(0.40), radius: 2.5, x: 0, y: 0)
             } else {
                 Text("AI Usage")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.system(size: textSize, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.62))
                     .shadow(color: .black.opacity(0.55), radius: 1, x: 0, y: 1)
             }

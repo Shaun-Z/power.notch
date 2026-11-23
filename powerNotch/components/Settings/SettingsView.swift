@@ -15,6 +15,7 @@ import SwiftUI
 import SwiftUIIntrospect
 
 struct SettingsView: View {
+    @Default(.developerOptionsEnabled) private var developerOptionsEnabled
     @State private var selectedTab = "General"
     @State private var accentColorUpdateTrigger = UUID()
 
@@ -66,6 +67,11 @@ struct SettingsView: View {
                 NavigationLink(value: "About") {
                     Label("About", systemImage: "info.circle")
                 }
+                if developerOptionsEnabled {
+                    NavigationLink(value: "Developer") {
+                        Label("Developer options", systemImage: "hammer")
+                    }
+                }
             }
             .listStyle(SidebarListStyle())
             .tint(.effectiveAccent)
@@ -96,6 +102,10 @@ struct SettingsView: View {
                     GeneralSettings()
                 case "Advanced":
                     Advanced()
+                case "Developer":
+                    if developerOptionsEnabled {
+                        DeveloperSettings()
+                    }
                 case "About":
                     if let controller = updaterController {
                         About(updaterController: controller)
@@ -126,17 +136,44 @@ struct SettingsView: View {
         .background(Color(NSColor.windowBackgroundColor))
         .tint(.effectiveAccent)
         .id(accentColorUpdateTrigger)
+        .onChange(of: developerOptionsEnabled) { _, isEnabled in
+            if !isEnabled && selectedTab == "Developer" {
+                selectedTab = "General"
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AccentColorChanged"))) { _ in
             accentColorUpdateTrigger = UUID()
         }
     }
 }
 
-struct GeneralSettings: View {
-    @State private var screens: [(uuid: String, name: String)] = NSScreen.screens.compactMap { screen in
-        guard let uuid = screen.displayUUID else { return nil }
-        return (uuid, screen.localizedName)
+private struct ConnectedDisplayInfo: Identifiable, Equatable {
+    let uuid: String
+    let name: String
+    let size: CGSize
+    let hasNotch: Bool
+    let isMain: Bool
+
+    var id: String { uuid }
+
+    @MainActor
+    static func currentDisplays() -> [ConnectedDisplayInfo] {
+        let mainUUID = NSScreen.main?.displayUUID
+        return NSScreen.screens.compactMap { screen in
+            guard let uuid = screen.displayUUID else { return nil }
+            return ConnectedDisplayInfo(
+                uuid: uuid,
+                name: screen.localizedName,
+                size: screen.frame.size,
+                hasNotch: screen.safeAreaInsets.top > 0,
+                isMain: uuid == mainUUID
+            )
+        }
     }
+}
+
+struct GeneralSettings: View {
+    @State private var displays: [ConnectedDisplayInfo] = ConnectedDisplayInfo.currentDisplays()
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject var coordinator = BoringViewCoordinator.shared
 
@@ -144,11 +181,7 @@ struct GeneralSettings: View {
     @Default(.showEmojis) var showEmojis
     @Default(.gestureSensitivity) var gestureSensitivity
     @Default(.minimumHoverDuration) var minimumHoverDuration
-    @Default(.nonNotchHeight) var nonNotchHeight
-    @Default(.nonNotchHeightMode) var nonNotchHeightMode
-    @Default(.notchHeight) var notchHeight
-    @Default(.notchHeightMode) var notchHeightMode
-    @Default(.showOnAllDisplays) var showOnAllDisplays
+    @Default(.displayNotchVisibility) var displayNotchVisibility
     @Default(.automaticallySwitchDisplay) var automaticallySwitchDisplay
     @Default(.enableGestures) var enableGestures
     @Default(.openNotchOnHover) var openNotchOnHover
@@ -165,26 +198,6 @@ struct GeneralSettings: View {
                 }
                 .tint(.effectiveAccent)
                 LaunchAtLogin.Toggle("Launch at login")
-                Defaults.Toggle(key: .showOnAllDisplays) {
-                    Text("Show on all displays")
-                }
-                .onChange(of: showOnAllDisplays) {
-                    NotificationCenter.default.post(
-                        name: Notification.Name.showOnAllDisplaysChanged, object: nil)
-                }
-                Picker("Preferred display", selection: $coordinator.preferredScreenUUID) {
-                    ForEach(screens, id: \.uuid) { screen in
-                        Text(screen.name).tag(screen.uuid as String?)
-                    }
-                }
-                .onChange(of: NSScreen.screens) {
-                    screens = NSScreen.screens.compactMap { screen in
-                        guard let uuid = screen.displayUUID else { return nil }
-                        return (uuid, screen.localizedName)
-                    }
-                }
-                .disabled(showOnAllDisplays)
-                
                 Defaults.Toggle(key: .automaticallySwitchDisplay) {
                     Text("Automatically switch displays")
                 }
@@ -192,76 +205,63 @@ struct GeneralSettings: View {
                         NotificationCenter.default.post(
                             name: Notification.Name.automaticallySwitchDisplayChanged, object: nil)
                     }
-                    .disabled(showOnAllDisplays)
             } header: {
                 Text("System features")
             }
 
             Section {
-                Picker(
-                    selection: $notchHeightMode,
-                    label:
-                        Text("Notch height on notch displays")
-                ) {
-                    Text("Match real notch height")
-                        .tag(WindowHeightMode.matchRealNotchSize)
-                    Text("Match menu bar height")
-                        .tag(WindowHeightMode.matchMenuBar)
-                    Text("Custom height")
-                        .tag(WindowHeightMode.custom)
-                }
-                .onChange(of: notchHeightMode) {
-                    switch notchHeightMode {
-                    case .matchRealNotchSize:
-                        notchHeight = 38
-                    case .matchMenuBar:
-                        notchHeight = 44
-                    case .custom:
-                        notchHeight = 38
+                ForEach(displays) { display in
+                    Toggle(isOn: Binding(
+                        get: {
+                            let _ = displayNotchVisibility
+                            let _ = automaticallySwitchDisplay
+                            return DisplayNotchSettings.isEnabled(forUUID: display.uuid)
+                        },
+                        set: { newValue in
+                            DisplayNotchSettings.setEnabled(newValue, forUUID: display.uuid)
+                        }
+                    )) {
+                        HStack(spacing: 8) {
+                            Image(systemName: display.hasNotch ? "laptopcomputer" : "display")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 18)
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text(display.name)
+                                    if display.isMain {
+                                        Text("Main")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 1)
+                                            .background(
+                                                Capsule().fill(Color.secondary.opacity(0.15))
+                                            )
+                                    }
+                                    if display.hasNotch {
+                                        Text("Notch")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 1)
+                                            .background(
+                                                Capsule().fill(Color.secondary.opacity(0.15))
+                                            )
+                                    }
+                                }
+                                Text("\(Int(display.size.width)) × \(Int(display.size.height)) pt")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
+                        }
                     }
-                    NotificationCenter.default.post(
-                        name: Notification.Name.notchHeightChanged, object: nil)
-                }
-                if notchHeightMode == .custom {
-                    Slider(value: $notchHeight, in: 15...45, step: 1) {
-                        Text("Custom notch size - \(notchHeight, specifier: "%.0f")")
-                    }
-                    .onChange(of: notchHeight) {
-                        NotificationCenter.default.post(
-                            name: Notification.Name.notchHeightChanged, object: nil)
-                    }
-                }
-                Picker("Notch height on non-notch displays", selection: $nonNotchHeightMode) {
-                    Text("Match menubar height")
-                        .tag(WindowHeightMode.matchMenuBar)
-                    Text("Match real notch height")
-                        .tag(WindowHeightMode.matchRealNotchSize)
-                    Text("Custom height")
-                        .tag(WindowHeightMode.custom)
-                }
-                .onChange(of: nonNotchHeightMode) {
-                    switch nonNotchHeightMode {
-                    case .matchMenuBar:
-                        nonNotchHeight = 24
-                    case .matchRealNotchSize:
-                        nonNotchHeight = 32
-                    case .custom:
-                        nonNotchHeight = 32
-                    }
-                    NotificationCenter.default.post(
-                        name: Notification.Name.notchHeightChanged, object: nil)
-                }
-                if nonNotchHeightMode == .custom {
-                    Slider(value: $nonNotchHeight, in: 0...40, step: 1) {
-                        Text("Custom notch size - \(nonNotchHeight, specifier: "%.0f")")
-                    }
-                    .onChange(of: nonNotchHeight) {
-                        NotificationCenter.default.post(
-                            name: Notification.Name.notchHeightChanged, object: nil)
-                    }
+                    .tint(.effectiveAccent)
                 }
             } header: {
-                Text("Notch sizing")
+                Text("Displays")
+            } footer: {
+                Text("Independently choose whether the notch is shown on each connected display.")
             }
 
             NotchBehaviour()
@@ -276,6 +276,12 @@ struct GeneralSettings: View {
         }
         .accentColor(.effectiveAccent)
         .navigationTitle("General")
+        .onAppear {
+            displays = ConnectedDisplayInfo.currentDisplays()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            displays = ConnectedDisplayInfo.currentDisplays()
+        }
         .onChange(of: openNotchOnHover) {
             if !openNotchOnHover {
                 enableGestures = true
@@ -341,10 +347,6 @@ struct GeneralSettings: View {
                         Text("\(minimumHoverDuration, specifier: "%.1f")s")
                             .foregroundStyle(.secondary)
                     }
-                }
-                .onChange(of: minimumHoverDuration) {
-                    NotificationCenter.default.post(
-                        name: Notification.Name.notchHeightChanged, object: nil)
                 }
             }
         } header: {
@@ -837,7 +839,320 @@ func lighterColor(from nsColor: NSColor, amount: CGFloat = 0.14) -> Color {
     return Color(red: Double(nr), green: Double(ng), blue: Double(nb), opacity: Double(a))
 }
 
+private struct DeveloperVersionTapSequence {
+    private var count = 0
+    private var lastTap: ContinuousClock.Instant?
+
+    mutating func register(at now: ContinuousClock.Instant = .now) -> Bool {
+        if let lastTap, lastTap.duration(to: now) <= .milliseconds(1200) {
+            count += 1
+        } else {
+            count = 1
+        }
+        lastTap = now
+        guard count >= 5 else { return false }
+        count = 0
+        self.lastTap = nil
+        return true
+    }
+}
+
+private struct DeveloperSettings: View {
+    @Default(.developerOptionsEnabled) private var developerOptionsEnabled
+    @Default(.developerAnimationSpeed) private var animationSpeed
+    @Default(.liquidGlassNotch) private var liquidGlassNotch
+    @Default(.developerClearLiquidGlass) private var clearLiquidGlass
+    @Default(.displayDynamicIslandTuning) private var displayDynamicIslandTuning
+    @Default(.displayNotchVisibility) private var displayNotchVisibility
+    @Default(.automaticallySwitchDisplay) private var automaticallySwitchDisplay
+    @Default(.dynamicIslandShape) private var dynamicIslandShape
+    @State private var screenRefreshToken = UUID()
+
+    private var enabledDisplays: [(info: ConnectedDisplayInfo, defaultHeight: Double)] {
+        let _ = screenRefreshToken
+        let _ = displayNotchVisibility
+        let _ = automaticallySwitchDisplay
+
+        let mainUUID = NSScreen.main?.displayUUID
+        return DisplayNotchSettings.enabledScreens().compactMap { screen in
+            guard let uuid = screen.displayUUID else { return nil }
+            let info = ConnectedDisplayInfo(
+                uuid: uuid,
+                name: screen.localizedName,
+                size: screen.frame.size,
+                hasNotch: screen.safeAreaInsets.top > 0,
+                isMain: uuid == mainUUID
+            )
+            let defaultHeight = Double(DisplayNotchSettings.defaultDynamicIslandHeight(for: screen))
+            return (info, defaultHeight)
+        }
+    }
+
+    private func tuning(for uuid: String) -> DisplayDynamicIslandTuning {
+        displayDynamicIslandTuning[uuid] ?? DisplayDynamicIslandTuning()
+    }
+
+    private func updateTuning(for uuid: String, mutate: (inout DisplayDynamicIslandTuning) -> Void) {
+        var current = tuning(for: uuid)
+        mutate(&current)
+        DisplayNotchSettings.setTuning(current, forUUID: uuid)
+    }
+
+    private func formattedOffset(_ value: Double) -> String {
+        let rounded = (value * 2).rounded() / 2
+        if rounded == 0 {
+            return "0.0 pt"
+        }
+        return String(format: "%+.1f pt", rounded)
+    }
+
+    private func formattedHeight(_ value: Double) -> String {
+        String(format: "%.1f pt", (value * 2).rounded() / 2)
+    }
+
+    var body: some View {
+        let activeDisplays = enabledDisplays
+        let hasAnyCustomTuning = activeDisplays.contains { !tuning(for: $0.info.uuid).isDefault }
+
+        Form {
+            Section {
+                Toggle("Show developer options", isOn: $developerOptionsEnabled)
+            } footer: {
+                Text("Turn off to hide Developer options from the sidebar. Tap the version number 5 times in About to show it again.")
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Animation speed")
+                        Spacer()
+                        HStack(spacing: 0) {
+                            Text(animationSpeed, format: .number.precision(.fractionLength(2)))
+                            Text(verbatim: "×")
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                    .monospacedDigit()
+                    Slider(value: $animationSpeed, in: 0.1...2, step: 0.05) {
+                        Text("Animation speed")
+                    } minimumValueLabel: {
+                        Text(verbatim: "0.1×")
+                    } maximumValueLabel: {
+                        Text(verbatim: "2×")
+                    }
+                    .labelsHidden()
+                    .accessibilityIdentifier("developerAnimationSpeedSlider")
+                }
+                Button("Reset animation speed") {
+                    animationSpeed = 1
+                }
+                .disabled(animationSpeed == 1)
+            } header: {
+                Text("Animations")
+            } footer: {
+                Text("Adjusts card expansion, collapse, album artwork, and lyric motion. 1× is normal speed.")
+            }
+
+            Section {
+                if !liquidGlassNotch {
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.secondary)
+                        Text("Liquid Glass is currently turned off in Appearance settings. Enable it there to preview the glass style.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Glass tint")
+                        Text(clearLiquidGlass ? "Colorless clear glass" : "Dark glass (Default)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(clearLiquidGlass ? "Switch to dark glass" : "Switch to clear glass") {
+                        clearLiquidGlass.toggle()
+                    }
+                }
+            } header: {
+                Text("Liquid Glass")
+            } footer: {
+                Text("Switch between the default dark tinted Liquid Glass and colorless transparent clear glass.")
+            }
+
+            Section {
+                if !dynamicIslandShape {
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.secondary)
+                        Text("Dynamic Island shape is currently turned off in Appearance settings. Values configured here take effect once Dynamic Island is enabled.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if activeDisplays.isEmpty {
+                    Text("No displays currently have the notch enabled. Enable at least one display in General settings.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(activeDisplays, id: \.info.uuid) { entry in
+                        let display = entry.info
+                        let defaultHeight = entry.defaultHeight
+                        let currentTuning = tuning(for: display.uuid)
+                        let effectiveHeight = currentTuning.totalHeight ?? defaultHeight
+
+                        let offsetBinding = Binding<Double>(
+                            get: { tuning(for: display.uuid).verticalOffset },
+                            set: { newValue in
+                                let clamped = min(
+                                    DisplayNotchSettings.verticalOffsetRange.upperBound,
+                                    max(DisplayNotchSettings.verticalOffsetRange.lowerBound, (newValue * 2).rounded() / 2)
+                                )
+                                updateTuning(for: display.uuid) { $0.verticalOffset = clamped }
+                            }
+                        )
+
+                        let heightBinding = Binding<Double>(
+                            get: { tuning(for: display.uuid).totalHeight ?? defaultHeight },
+                            set: { newValue in
+                                let clamped = min(
+                                    DisplayNotchSettings.totalHeightRange.upperBound,
+                                    max(DisplayNotchSettings.totalHeightRange.lowerBound, (newValue * 2).rounded() / 2)
+                                )
+                                updateTuning(for: display.uuid) { $0.totalHeight = clamped }
+                            }
+                        )
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 8) {
+                                Image(systemName: display.hasNotch ? "laptopcomputer" : "display")
+                                    .foregroundStyle(.secondary)
+                                Text(display.name)
+                                    .font(.headline)
+                                Text(display.hasNotch ? "Notch" : "Non-notch")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1)
+                                    .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                                Spacer()
+                                Button("Reset") {
+                                    DisplayNotchSettings.resetTuning(forUUID: display.uuid)
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(currentTuning.isDefault)
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Vertical offset")
+                                    Spacer()
+                                    Text(formattedOffset(currentTuning.verticalOffset))
+                                        .foregroundStyle(.secondary)
+                                        .monospacedDigit()
+                                    Stepper(
+                                        "",
+                                        value: offsetBinding,
+                                        in: DisplayNotchSettings.verticalOffsetRange,
+                                        step: 0.5
+                                    )
+                                    .labelsHidden()
+                                    .controlSize(.small)
+                                }
+                                Slider(
+                                    value: offsetBinding,
+                                    in: DisplayNotchSettings.verticalOffsetRange,
+                                    step: 0.5
+                                ) {
+                                    Text("Vertical offset")
+                                } minimumValueLabel: {
+                                    Text(verbatim: "-12 pt")
+                                        .font(.caption2)
+                                } maximumValueLabel: {
+                                    Text(verbatim: "+24 pt")
+                                        .font(.caption2)
+                                }
+                                .labelsHidden()
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Text("Total height")
+                                    if currentTuning.totalHeight == nil {
+                                        Text("Default")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 1)
+                                            .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                                    } else {
+                                        Button("Auto") {
+                                            updateTuning(for: display.uuid) { $0.totalHeight = nil }
+                                        }
+                                        .buttonStyle(.borderless)
+                                        .font(.caption)
+                                    }
+                                    Spacer()
+                                    Text(formattedHeight(effectiveHeight))
+                                        .foregroundStyle(.secondary)
+                                        .monospacedDigit()
+                                    Stepper(
+                                        "",
+                                        value: heightBinding,
+                                        in: DisplayNotchSettings.totalHeightRange,
+                                        step: 0.5
+                                    )
+                                    .labelsHidden()
+                                    .controlSize(.small)
+                                }
+                                Slider(
+                                    value: heightBinding,
+                                    in: DisplayNotchSettings.totalHeightRange,
+                                    step: 0.5
+                                ) {
+                                    Text("Total height")
+                                } minimumValueLabel: {
+                                    Text(verbatim: "14 pt")
+                                        .font(.caption2)
+                                } maximumValueLabel: {
+                                    Text(verbatim: "48 pt")
+                                        .font(.caption2)
+                                }
+                                .labelsHidden()
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+
+                    if activeDisplays.count > 1 {
+                        Button("Reset all displays") {
+                            DisplayNotchSettings.resetAllTuning()
+                        }
+                        .disabled(!hasAnyCustomTuning)
+                    }
+                }
+            } header: {
+                Text("Dynamic Island layout")
+            } footer: {
+                Text("Independently adjust each enabled display's Dynamic Island vertical offset relative to its default position (positive moves down, negative moves up) and closed total height in points. Inner elements scale automatically.")
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            screenRefreshToken = UUID()
+        }
+        .onAppear {
+            screenRefreshToken = UUID()
+        }
+        .navigationTitle("Developer options")
+    }
+}
+
 struct About: View {
+    @Default(.developerOptionsEnabled) private var developerOptionsEnabled
+    @State private var versionTaps = DeveloperVersionTapSequence()
     @State private var showBuildNumber: Bool = false
     let updaterController: SPUStandardUpdaterController
     @Environment(\.openWindow) var openWindow
@@ -861,7 +1176,11 @@ struct About: View {
                         Text(Bundle.main.releaseVersionNumber ?? "unkown")
                             .foregroundStyle(.secondary)
                     }
+                    .contentShape(Rectangle())
                     .onTapGesture {
+                        if versionTaps.register() {
+                            developerOptionsEnabled = true
+                        }
                         withAnimation {
                             showBuildNumber.toggle()
                         }
@@ -1190,6 +1509,23 @@ struct Appearance: View {
             }
 
             Section {
+                Defaults.Toggle(key: .liquidGlassNotch) {
+                    Text("Liquid Glass expanded notch")
+                }
+                LiquidGlassOpacitySetting()
+                Defaults.Toggle(key: .dynamicIslandShape) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Dynamic Island expanded shape")
+                        Text("Morph expanded wings and card into a rounded Dynamic Island contour matching inner corners")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Liquid Glass & Dynamic Island")
+            }
+
+            Section {
                 Defaults.Toggle(key: .coloredSpectrogram) {
                     Text("Colored spectrogram")
                 }
@@ -1414,6 +1750,47 @@ struct Appearance: View {
     }
 }
 
+private struct LiquidGlassOpacitySetting: View {
+    @Default(.liquidGlassNotch) private var liquidGlassNotch
+    @Default(.liquidGlassOpacity) private var liquidGlassOpacity
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Glass opacity")
+                Spacer()
+                Text(liquidGlassOpacity, format: .percent.precision(.fractionLength(0)))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+
+            Slider(
+                value: Binding<Float>(
+                    get: { LiquidGlassAppearance.materialAmount(for: liquidGlassOpacity) },
+                    set: { liquidGlassOpacity = Double($0) }
+                ),
+                in: 0...1
+            ) {
+                Text("Glass opacity")
+            } minimumValueLabel: {
+                Image(systemName: "square.on.square")
+                    .accessibilityLabel("More transparent")
+                    .help("More transparent")
+            } maximumValueLabel: {
+                Image(systemName: "square.on.square.fill")
+                    .accessibilityLabel("More opaque")
+                    .help("More opaque")
+            }
+            .labelsHidden()
+            .environment(\.symbolVariants, .none)
+            .tint(.gray)
+            .accessibilityValue(Text(liquidGlassOpacity, format: .percent.precision(.fractionLength(0))))
+            .accessibilityIdentifier("liquidGlassOpacitySlider")
+        }
+        .disabled(!liquidGlassNotch)
+    }
+}
+
 struct Advanced: View {
     @Default(.useCustomAccentColor) var useCustomAccentColor
     @Default(.customAccentColorData) var customAccentColorData
@@ -1568,17 +1945,6 @@ struct Advanced: View {
                 }
                 Defaults.Toggle(key: .cornerRadiusScaling) {
                     Text("Corner radius scaling")
-                }
-                Defaults.Toggle(key: .liquidGlassNotch) {
-                    Text("Liquid Glass expanded notch")
-                }
-                Defaults.Toggle(key: .dynamicIslandShape) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Dynamic Island expanded shape")
-                        Text("Morph expanded wings and card into a rounded Dynamic Island contour matching inner corners")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                 }
             } header: {
                 Text("Window Appearance")
@@ -1812,4 +2178,21 @@ func warningBadge(_ text: String, _ description: String) -> some View {
 
 #Preview {
     HUD()
+}
+
+#Preview("Developer options") {
+    DeveloperSettings()
+        .formStyle(.grouped)
+        .frame(width: 460, height: 220)
+}
+
+#Preview("Liquid Glass appearance") {
+    Form {
+        Defaults.Toggle(key: .liquidGlassNotch) {
+            Text("Liquid Glass expanded notch")
+        }
+        LiquidGlassOpacitySetting()
+    }
+    .formStyle(.grouped)
+    .frame(width: 460, height: 170)
 }

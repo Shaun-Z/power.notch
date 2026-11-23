@@ -39,6 +39,135 @@ enum HideNotchOption: String, Defaults.Serializable {
 // Define notification names at file scope
 extension Notification.Name {
     static let mediaControllerChanged = Notification.Name("mediaControllerChanged")
+    static let displayNotchVisibilityChanged = Notification.Name("displayNotchVisibilityChanged")
+}
+
+/// Per-display Dynamic Island layout overrides configured in Developer Options.
+struct DisplayDynamicIslandTuning: Codable, Equatable, Defaults.Serializable {
+    /// Vertical offset in points relative to the display's default Dynamic Island position.
+    /// Positive moves the island downward; negative moves it upward.
+    var verticalOffset: Double = 0
+    /// Optional explicit total closed Dynamic Island height in points.
+    /// When `nil`, the display's automatic default height is used.
+    var totalHeight: Double? = nil
+
+    var isDefault: Bool {
+        verticalOffset == 0 && totalHeight == nil
+    }
+}
+
+@MainActor
+enum DisplayNotchSettings {
+    static let verticalOffsetRange: ClosedRange<Double> = -12...24
+    static let totalHeightRange: ClosedRange<Double> = 14...48
+    /// Default height trim (pt) below the system menu bar height (`H_mb - 1pt`)
+    /// applied uniformly across both notched and non-notched displays.
+    static let menuBarDefaultHeightTrim: CGFloat = 1.0
+
+    /// Returns whether the notch should be shown on the given display.
+    static func isEnabled(for screen: NSScreen) -> Bool {
+        guard let uuid = screen.displayUUID else { return false }
+        return isEnabled(forUUID: uuid, connectedScreens: NSScreen.screens)
+    }
+
+    static func isEnabled(
+        forUUID uuid: String,
+        connectedScreens: [NSScreen] = NSScreen.screens
+    ) -> Bool {
+        let overrides = Defaults[.displayNotchVisibility]
+        if let explicit = overrides[uuid] {
+            return explicit
+        }
+        if overrides.isEmpty || Defaults[.automaticallySwitchDisplay] {
+            if let mainUUID = NSScreen.main?.displayUUID {
+                return uuid == mainUUID
+            }
+            return uuid == connectedScreens.first?.displayUUID
+        }
+        return false
+    }
+
+    /// Returns all currently connected displays that have the notch enabled.
+    static func enabledScreens(
+        connectedScreens: [NSScreen] = NSScreen.screens
+    ) -> [NSScreen] {
+        connectedScreens.filter { screen in
+            guard let uuid = screen.displayUUID else { return false }
+            return isEnabled(forUUID: uuid, connectedScreens: connectedScreens)
+        }
+    }
+
+    /// Sets notch visibility for a single display while preserving the current effective
+    /// visibility of all other connected displays.
+    static func setEnabled(
+        _ enabled: Bool,
+        forUUID targetUUID: String,
+        connectedScreens: [NSScreen] = NSScreen.screens
+    ) {
+        var updated = Defaults[.displayNotchVisibility]
+        for screen in connectedScreens {
+            guard let uuid = screen.displayUUID else { continue }
+            if updated[uuid] == nil {
+                updated[uuid] = isEnabled(
+                    forUUID: uuid,
+                    connectedScreens: connectedScreens
+                )
+            }
+        }
+        updated[targetUUID] = enabled
+        Defaults[.displayNotchVisibility] = updated
+        NotificationCenter.default.post(name: .displayNotchVisibilityChanged, object: nil)
+    }
+
+    /// Default top clearance (pt) below the screen's top edge for Dynamic Island on the given screen.
+    static func defaultDynamicIslandTopInset(for screen: NSScreen) -> CGFloat {
+        0
+    }
+
+    /// Returns the display's system menu bar height (`frame.maxY - visibleFrame.maxY`),
+    /// falling back to `safeAreaInsets.top` or closed notch height if the menu bar is globally auto-hidden.
+    static func menuBarHeight(for screen: NSScreen) -> CGFloat {
+        let visibleMenuBar = screen.frame.maxY - screen.visibleFrame.maxY
+        if visibleMenuBar > 0 {
+            return visibleMenuBar
+        }
+        if screen.safeAreaInsets.top > 0 {
+            return screen.safeAreaInsets.top
+        }
+        return getClosedNotchSize(screenUUID: screen.displayUUID).height
+    }
+
+    /// Default closed notch / Dynamic Island total height (pt) on the given screen when no developer override is set.
+    static func defaultDynamicIslandHeight(for screen: NSScreen) -> CGFloat {
+        let hmb = menuBarHeight(for: screen)
+        guard hmb > 0 else { return 0 }
+        return max(14, hmb - menuBarDefaultHeightTrim)
+    }
+
+    static func tuning(forUUID uuid: String?) -> DisplayDynamicIslandTuning {
+        guard let uuid else { return DisplayDynamicIslandTuning() }
+        return Defaults[.displayDynamicIslandTuning][uuid] ?? DisplayDynamicIslandTuning()
+    }
+
+    static func setTuning(_ tuning: DisplayDynamicIslandTuning, forUUID uuid: String) {
+        var all = Defaults[.displayDynamicIslandTuning]
+        if tuning.isDefault {
+            all.removeValue(forKey: uuid)
+        } else {
+            all[uuid] = tuning
+        }
+        Defaults[.displayDynamicIslandTuning] = all
+    }
+
+    static func resetTuning(forUUID uuid: String) {
+        var all = Defaults[.displayDynamicIslandTuning]
+        all.removeValue(forKey: uuid)
+        Defaults[.displayDynamicIslandTuning] = all
+    }
+
+    static func resetAllTuning() {
+        Defaults[.displayDynamicIslandTuning] = [:]
+    }
 }
 
 // Media controller types for selection in settings
@@ -71,7 +200,7 @@ enum OptionKeyAction: String, CaseIterable, Identifiable, Defaults.Serializable 
 extension Defaults.Keys {
     // MARK: General
     static let menubarIcon = Key<Bool>("menubarIcon", default: true)
-    static let showOnAllDisplays = Key<Bool>("showOnAllDisplays", default: false)
+    static let displayNotchVisibility = Key<[String: Bool]>("displayNotchVisibility", default: [:])
     static let automaticallySwitchDisplay = Key<Bool>("automaticallySwitchDisplay", default: true)
     static let releaseName = Key<String>("releaseName", default: "Flying Rabbit 🐇🪽")
     
@@ -80,20 +209,19 @@ extension Defaults.Keys {
     static let enableHaptics = Key<Bool>("enableHaptics", default: true)
     static let openNotchOnHover = Key<Bool>("openNotchOnHover", default: true)
     static let extendHoverArea = Key<Bool>("extendHoverArea", default: false)
-    static let notchHeightMode = Key<WindowHeightMode>(
-        "notchHeightMode",
-        default: WindowHeightMode.matchRealNotchSize
-    )
-    static let nonNotchHeightMode = Key<WindowHeightMode>(
-        "nonNotchHeightMode",
-        default: WindowHeightMode.matchMenuBar
-    )
-    static let nonNotchHeight = Key<CGFloat>("nonNotchHeight", default: 32)
-    static let notchHeight = Key<CGFloat>("notchHeight", default: 32)
     //static let openLastTabByDefault = Key<Bool>("openLastTabByDefault", default: false)
     static let showOnLockScreen = Key<Bool>("showOnLockScreen", default: false)
     static let hideFromScreenRecording = Key<Bool>("hideFromScreenRecording", default: false)
     
+    // MARK: Developer
+    static let developerOptionsEnabled = Key<Bool>("developerOptionsEnabled", default: false)
+    static let developerAnimationSpeed = Key<Double>("developerAnimationSpeed", default: 1.0)
+    static let developerClearLiquidGlass = Key<Bool>("developerClearLiquidGlass", default: false)
+    static let displayDynamicIslandTuning = Key<[String: DisplayDynamicIslandTuning]>(
+        "displayDynamicIslandTuning",
+        default: [:]
+    )
+
     // MARK: Appearance
     static let showEmojis = Key<Bool>("showEmojis", default: false)
     //static let alwaysShowTabs = Key<Bool>("alwaysShowTabs", default: true)
@@ -104,6 +232,7 @@ extension Defaults.Keys {
     static let enableShadow = Key<Bool>("enableShadow", default: true)
     static let cornerRadiusScaling = Key<Bool>("cornerRadiusScaling", default: true)
     static let liquidGlassNotch = Key<Bool>("liquidGlassNotch", default: true)
+    static let liquidGlassOpacity = Key<Double>("liquidGlassOpacity", default: 1.0)
     static let dynamicIslandShape = Key<Bool>("dynamicIslandShape", default: false)
 
     static let showNotHumanFace = Key<Bool>("showNotHumanFace", default: false)

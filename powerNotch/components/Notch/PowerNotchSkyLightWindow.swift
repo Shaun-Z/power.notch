@@ -109,6 +109,26 @@ class PowerNotchSkyLightWindow: NSPanel {
     
     private var observers: Set<AnyCancellable> = []
     
+    // Liquid Glass uses this private appearance query separately from keyboard focus.
+    // Claim active appearance only for glass, so a nonactivating notch panel keeps its
+    // lens treatment without ever becoming the key/main window.
+    @objc(_hasActiveAppearance)
+    private func notchHasActiveAppearance() -> Bool {
+        if #available(macOS 26.0, *), Defaults[.liquidGlassNotch] {
+            return true
+        }
+
+        let selector = NSSelectorFromString("_hasActiveAppearance")
+        guard let method = class_getInstanceMethod(NSPanel.self, selector),
+              method_getNumberOfArguments(method) == 2 else { return isKeyWindow }
+        let returnType = method_copyReturnType(method)
+        defer { free(returnType) }
+        guard ["B", "c"].contains(String(cString: returnType)) else { return isKeyWindow }
+        typealias AppearanceQuery = @convention(c) (AnyObject, Selector) -> Bool
+        let query = unsafeBitCast(method_getImplementation(method), to: AppearanceQuery.self)
+        return query(self, selector)
+    }
+
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }

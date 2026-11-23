@@ -13,6 +13,9 @@ let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
 let shadowPadding: CGFloat = 26
+/// Extra vertical headroom in the window to accommodate downward Dynamic Island offsets
+/// configured in Developer Options without clipping the expanded card or rim glow.
+let dynamicIslandMaxVerticalOffset: CGFloat = 24
 /// Horizontal margin reserved in the window for outward-diffusing rim halos
 let rimGlowHorizontalPadding: CGFloat = 18
 /// Maximum horizontal flare width of the hanging notch's concave top meniscus ears
@@ -20,7 +23,7 @@ let openNotchEarMaxInset: CGFloat = 22
 let openNotchSize: CGSize = .init(width: 640, height: 226)
 let windowSize: CGSize = .init(
     width: openNotchSize.width + openNotchEarMaxInset * 2 + rimGlowHorizontalPadding * 2,
-    height: openNotchSize.height + shadowPadding
+    height: openNotchSize.height + shadowPadding + dynamicIslandMaxVerticalOffset
 )
 let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 19, bottom: 24), closed: (top: 6, bottom: 14))
 
@@ -71,8 +74,7 @@ enum MusicPlayerImageSizes {
 }
 
 @MainActor func getClosedNotchSize(screenUUID: String? = nil) -> CGSize {
-    // Default notch size, to avoid using optionals
-    var notchHeight: CGFloat = Defaults[.nonNotchHeight]
+    var notchHeight: CGFloat = 32
     var notchWidth: CGFloat = 185
 
     var selectedScreen = NSScreen.main
@@ -81,7 +83,6 @@ enum MusicPlayerImageSizes {
         selectedScreen = NSScreen.screen(withUUID: uuid)
     }
 
-    // Check if the screen is available
     if let screen = selectedScreen {
         // Calculate and set the exact width of the notch
         if let topLeftNotchpadding: CGFloat = screen.auxiliaryTopLeftArea?.width,
@@ -90,21 +91,11 @@ enum MusicPlayerImageSizes {
             notchWidth = screen.frame.width - topLeftNotchpadding - topRightNotchpadding + 4
         }
 
-        // Check if the Mac has a notch
-        if screen.safeAreaInsets.top > 0 {
-            // This is a display WITH a notch - use notch height settings
-            notchHeight = Defaults[.notchHeight]
-            if Defaults[.notchHeightMode] == .matchRealNotchSize {
-                notchHeight = screen.safeAreaInsets.top
-            } else if Defaults[.notchHeightMode] == .matchMenuBar {
-                notchHeight = screen.frame.maxY - screen.visibleFrame.maxY
-            }
-        } else {
-            // This is a display WITHOUT a notch - use non-notch height settings
-            notchHeight = Defaults[.nonNotchHeight]
-            if Defaults[.nonNotchHeightMode] == .matchMenuBar {
-                notchHeight = screen.frame.maxY - screen.visibleFrame.maxY
-            }
+        let menuBarHeight = screen.frame.maxY - screen.visibleFrame.maxY
+        if menuBarHeight > 0 {
+            notchHeight = menuBarHeight
+        } else if screen.safeAreaInsets.top > 0 {
+            notchHeight = screen.safeAreaInsets.top
         }
     }
 

@@ -305,13 +305,12 @@ final class NotchCursorOcclusionNSView: NSView {
             return .zero
         }
 
-        let clampedWidth = min(physicalNotch.width, max(0, notchBounds.width - 44))
-        let clampedHeight = min(physicalNotch.height, notchBounds.height * 0.45)
-
-        // Wide enough that both the pure-black core and Gaussian veil reach alpha == 0
-        // well inside the zone perimeter so hardware <-> software handoff is invisible.
-        let zoneWidth = min(notchBounds.width, clampedWidth + clampedHeight * 4.8)
-        let zoneHeight = min(notchBounds.height, clampedHeight * 3.4)
+        let extent = HardwareNotchInkGeometry(
+            physicalNotchSize: physicalNotch,
+            surfaceSize: notchBounds.size
+        ).extentSize
+        let zoneWidth = extent.width
+        let zoneHeight = extent.height
 
         return NSRect(
             x: notchBounds.midX - zoneWidth / 2,
@@ -461,62 +460,12 @@ final class NotchCursorOcclusionNSView: NSView {
         guard key != cachedMaskKey else { return }
 
         let notchBounds = activeNotchRect
-        let clampedWidth = min(physicalNotch.width, max(0, notchBounds.width - 44))
-        let clampedHeight = min(physicalNotch.height, notchBounds.height * 0.45)
-
-        // Render the exact same Gaussian black core + mid-range veil as
-        // NotchGlassBackground.hardwareNotchDarkTransition, feathered softly to 0
-        // before the zone edges so hardware <-> software cursor handoff has zero seam.
-        let maskView = ZStack(alignment: .top) {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: max(18, clampedHeight * 0.75),
-                bottomTrailingRadius: max(18, clampedHeight * 0.75),
-                topTrailingRadius: 0,
-                style: .continuous
-            )
-            .fill(Color.black.opacity(0.78))
-            .frame(width: clampedWidth + clampedHeight * 1.8, height: clampedHeight * 2.15)
-            .blur(radius: max(18, clampedHeight * 0.74))
-            .offset(y: -clampedHeight * 0.32)
-
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: max(12, clampedHeight * 0.48),
-                bottomTrailingRadius: max(12, clampedHeight * 0.48),
-                topTrailingRadius: 0,
-                style: .continuous
-            )
-            .fill(Color.black)
-            .frame(width: clampedWidth + clampedHeight * 0.65, height: clampedHeight * 1.48)
-            .blur(radius: max(10, clampedHeight * 0.38))
-            .offset(y: -4)
-        }
+        // Render the same ink alpha as the visible background, then crop to its extent.
+        let maskView = HardwareNotchInkTransition(
+            physicalNotchSize: physicalNotch,
+            surfaceSize: notchBounds.size
+        )
         .frame(width: zone.width, height: zone.height, alignment: .top)
-        .mask {
-            // Soft outer boundary taper guaranteeing alpha == 0.0 at zone left/right/bottom edges
-            LinearGradient(
-                stops: [
-                    .init(color: .white, location: 0.0),
-                    .init(color: .white, location: 0.78),
-                    .init(color: .clear, location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .mask {
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0.0),
-                        .init(color: .white, location: 0.12),
-                        .init(color: .white, location: 0.88),
-                        .init(color: .clear, location: 1.0)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            }
-        }
         .clipped()
 
         let renderer = ImageRenderer(content: maskView)

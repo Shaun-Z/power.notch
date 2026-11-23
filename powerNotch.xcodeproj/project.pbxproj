@@ -115,6 +115,7 @@
 		9A987A0D2C73CA66005CA465 /* ShelfView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A987A032C73CA66005CA465 /* ShelfView.swift */; };
 		9A987A102C73CA8D005CA465 /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 9A987A0F2C73CA8D005CA465 /* Collections */; };
 		9AB0C6BD2C73C9CB00F7CD30 /* NotchHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */; };
+		9B12B12F30B40239004D9B72 /* LiquidGlassAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B12B12E30B40239004D9B72 /* LiquidGlassAppearance.swift */; };
 		9B9763D130B0178700CCA45B /* NotchCursorOcclusionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9763D030B0178700CCA45B /* NotchCursorOcclusionView.swift */; };
 		9B9763D330B0373500CCA45B /* AIUsageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9763D230B0373500CCA45B /* AIUsageModels.swift */; };
 		9B9763D530B037CA00CCA45B /* AIUsageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9763D430B037CA00CCA45B /* AIUsageManager.swift */; };
@@ -313,6 +314,7 @@
 		9A0887342C7AFF8E00C160EA /* TabSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSelectionView.swift; sourceTree = "<group>"; };
 		9A987A032C73CA66005CA465 /* ShelfView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
 		9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotchHomeView.swift; sourceTree = "<group>"; };
+		9B12B12E30B40239004D9B72 /* LiquidGlassAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassAppearance.swift; sourceTree = "<group>"; };
 		9B9763D030B0178700CCA45B /* NotchCursorOcclusionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchCursorOcclusionView.swift; sourceTree = "<group>"; };
 		9B9763D230B0373500CCA45B /* AIUsageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageModels.swift; sourceTree = "<group>"; };
 		9B9763D430B037CA00CCA45B /* AIUsageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageManager.swift; sourceTree = "<group>"; };
@@ -519,6 +521,7 @@
 				14288DD62C6E015000B9F80C /* AudioPlayer.swift */,
 				5955950C2E900ED800C66711 /* ApplicationRelauncher.swift */,
 				14288E0B2C6F8EC000B9F80C /* AppIcons.swift */,
+				9B12B12E30B40239004D9B72 /* LiquidGlassAppearance.swift */,
 			);
 			path = helpers;
 			sourceTree = "<group>";
@@ -1092,6 +1095,7 @@
 				11C5E3162DFE88510065821E /* SettingsView.swift in Sources */,
 				9B97640630B2F04300CCA45B /* AIUsageHistoryCollector.swift in Sources */,
 				1153BD932D986E4300979FB0 /* AppleMusicController.swift in Sources */,
+				9B12B12F30B40239004D9B72 /* LiquidGlassAppearance.swift in Sources */,
 				11C5E3132DFE85970065821E /* SettingsWindowController.swift in Sources */,
 				110029272E84FD4C00035A57 /* TemporaryFileStorageService.swift in Sources */,
 				11CFC6652E09C7B300748C80 /* OnboardingFinishView.swift in Sources */,

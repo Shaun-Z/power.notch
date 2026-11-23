@@ -15,7 +15,13 @@ struct InlineHUD: View {
     @Binding var icon: String
     @Binding var hoverAnimation: Bool
     @Binding var gestureProgress: CGFloat
+    var rowHeight: CGFloat? = nil
     @Default(.liquidGlassNotch) private var liquidGlassNotch
+
+    private var effectiveHeight: CGFloat {
+        rowHeight ?? vm.closedNotchSize.height
+    }
+
     var body: some View {
         HStack {
             HStack(spacing: 5) {
@@ -62,7 +68,7 @@ struct InlineHUD: View {
                     .allowsTightening(true)
                     .contentTransition(.numericText())
             }
-            .frame(width: 100 - (hoverAnimation ? 0 : 12) + gestureProgress / 2, height: vm.notchSize.height - (hoverAnimation ? 0 : 12), alignment: .leading)
+            .frame(width: 100 - (hoverAnimation ? 0 : 12) + gestureProgress / 2, height: max(10, effectiveHeight - (hoverAnimation ? 0 : min(12, effectiveHeight * 0.35))), alignment: .leading)
             
             Rectangle()
                 .fill(liquidGlassNotch ? .clear : .black)
@@ -107,9 +113,9 @@ struct InlineHUD: View {
                 }
             }
             .padding(.trailing, 4)
-            .frame(width: 100 - (hoverAnimation ? 0 : 12) + gestureProgress / 2, height: vm.closedNotchSize.height - (hoverAnimation ? 0 : 12), alignment: .center)
+            .frame(width: 100 - (hoverAnimation ? 0 : 12) + gestureProgress / 2, height: max(10, effectiveHeight - (hoverAnimation ? 0 : min(12, effectiveHeight * 0.35))), alignment: .center)
         }
-        .frame(height: vm.closedNotchSize.height + (hoverAnimation ? 8 : 0), alignment: .center)
+        .frame(height: effectiveHeight + (hoverAnimation ? 8 : 0), alignment: .center)
     }
     
     func SpeakerSymbol(_ value: CGFloat) -> String {

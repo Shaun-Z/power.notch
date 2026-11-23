@@ -1257,6 +1257,31 @@ class MusicManager: ObservableObject {
         return syncedLyrics[idx].text
     }
 
+    /// Returns the remaining duration (in seconds) until the next synced lyric line begins,
+    /// or `nil` when lyrics are unsynced or before the first timestamp.
+    func lyricLineRemainingDuration(at elapsed: Double) -> TimeInterval? {
+        guard !syncedLyrics.isEmpty, elapsed >= syncedLyrics[0].time else { return nil }
+        var low = 0
+        var high = syncedLyrics.count - 1
+        var idx = 0
+        while low <= high {
+            let mid = (low + high) / 2
+            if syncedLyrics[mid].time <= elapsed {
+                idx = mid
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+        if idx + 1 < syncedLyrics.count {
+            return max(0.5, syncedLyrics[idx + 1].time - elapsed)
+        }
+        if songDuration > elapsed {
+            return max(0.5, songDuration - elapsed)
+        }
+        return nil
+    }
+
     private func triggerFlipAnimation() {
         // Cancel any existing animation
         flipWorkItem?.cancel()

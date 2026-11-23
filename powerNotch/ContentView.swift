@@ -45,7 +45,7 @@ struct ContentView: View {
 
     @Default(.enableAIUsageNotchTab) var enableAIUsageNotchTab
 
-    @Default(.notchHeightMode) var notchHeightMode
+    @Default(.displayDynamicIslandTuning) var displayDynamicIslandTuning
 
     // Shared interactive spring for movement/resizing to avoid conflicting animations
     private let animationSpring = Animation.interactiveSpring(response: 0.38, dampingFraction: 1.0, blendDuration: 0)
@@ -123,6 +123,37 @@ struct ContentView: View {
         return !hasPhysicalNotch && vm.effectiveClosedNotchHeight > 0
     }
 
+    private var isFloatingDynamicIsland: Bool {
+        !hasPhysicalNotch && isDynamicIslandActive
+    }
+
+    private var currentDynamicIslandTuning: DisplayDynamicIslandTuning {
+        guard let uuid = vm.screenUUID else { return DisplayDynamicIslandTuning() }
+        return displayDynamicIslandTuning[uuid] ?? DisplayDynamicIslandTuning()
+    }
+
+    /// Default top clearance below the physical screen top edge for the Dynamic Island.
+    /// Zero on all displays so non-notched displays span the full menu bar height by default.
+    private var defaultDynamicIslandTopInset: CGFloat {
+        0
+    }
+
+    /// Effective vertical offset (pt) from the screen's top edge for the Dynamic Island,
+    /// combining the display's default clearance with any Developer Options per-display offset.
+    private var effectiveDynamicIslandTopOffset: CGFloat {
+        guard isDynamicIslandActive else { return 0 }
+        guard vm.notchState == .open || vm.effectiveClosedNotchHeight > 0 else { return 0 }
+        return defaultDynamicIslandTopInset + CGFloat(currentDynamicIslandTuning.verticalOffset)
+    }
+
+    private var dynamicIslandTopPadding: CGFloat {
+        max(0, effectiveDynamicIslandTopOffset)
+    }
+
+    private var dynamicIslandNegativeYOffset: CGFloat {
+        min(0, effectiveDynamicIslandTopOffset)
+    }
+
     private var islandMorph: CGFloat {
         isDynamicIslandActive ? 1.0 : 0.0
     }
@@ -147,7 +178,7 @@ struct ContentView: View {
                 return 22
             }
             // Exact semicircular capsule radius matching full closed pill height (R_outer = H_pill / 2)
-            return max(16, closedVisualHeight / 2)
+            return max(0, closedVisualHeight / 2)
         }
         guard vm.notchState == .open && Defaults[.cornerRadiusScaling] else {
             return cornerRadiusInsets.closed.top
@@ -155,37 +186,35 @@ struct ContentView: View {
         return liquidGlassNotch ? openNotchEarMaxInset : cornerRadiusInsets.opened.top
     }
 
-    /// Exact visual bottom ceiling of the menu bar / fullscreen top bar on a notched display.
-    /// - Desktop, maximized window, or fullscreen with visible menu bar: `frame.maxY - visibleFrame.maxY`.
-    /// - Native fullscreen with auto-hidden menu bar: `safeAreaInsets.top` (`physicalHeight`).
-    private var currentNotchedMenuBarCeiling: CGFloat {
-        guard let physicalHeight = vm.physicalNotchSize?.height, physicalHeight > 0 else {
-            return 0
+    private var defaultClosedVisualHeight: CGFloat {
+        guard vm.effectiveClosedNotchHeight > 0 else { return 0 }
+        if let screen = vm.screenUUID.flatMap({ NSScreen.screen(withUUID: $0) }) ?? NSScreen.main {
+            let hmb = DisplayNotchSettings.menuBarHeight(for: screen)
+            if hmb > 0 {
+                return max(14, hmb - DisplayNotchSettings.menuBarDefaultHeightTrim)
+            }
         }
-        guard let screen = vm.screenUUID.flatMap({ NSScreen.screen(withUUID: $0) }) ?? NSScreen.main else {
-            return physicalHeight
-        }
-        let visibleMenuBar = screen.frame.maxY - screen.visibleFrame.maxY
-        let menuBarHiddenInFullscreen = vm.isAnyFullscreen
-            && !UserDefaults.standard.bool(forKey: "AppleMenuBarVisibleInFullscreen")
-        if menuBarHiddenInFullscreen || visibleMenuBar <= 0 {
-            return physicalHeight
-        }
-        return max(physicalHeight, visibleMenuBar)
+        return max(14, vm.effectiveClosedNotchHeight - DisplayNotchSettings.menuBarDefaultHeightTrim)
     }
 
     private var closedVisualHeight: CGFloat {
         guard vm.effectiveClosedNotchHeight > 0 else { return 0 }
-        if hasPhysicalNotch && notchHeightMode != .custom {
-            // Sit flush with the menu bar / fullscreen top bar boundary (never expanding downward
-            // when media plays, since the outward music halo blooms outside the black bezel).
-            return currentNotchedMenuBarCeiling
+        if isDynamicIslandActive, let customHeight = currentDynamicIslandTuning.totalHeight {
+            return max(14, CGFloat(customHeight))
         }
-        return vm.effectiveClosedNotchHeight
+        return defaultClosedVisualHeight
     }
 
     private var closedLiveActivitySide: CGFloat {
-        max(0, min(vm.effectiveClosedNotchHeight, closedVisualHeight) - 12)
+        let baseHeight = closedVisualHeight
+        guard baseHeight > 0 else { return 0 }
+        let verticalMargin: CGFloat
+        if baseHeight <= 21 {
+            verticalMargin = max(3.5, baseHeight * 0.24)
+        } else {
+            verticalMargin = min(12, max(5, baseHeight - 16))
+        }
+        return max(8, baseHeight - verticalMargin)
     }
 
     private var bottomCornerRadius: CGFloat {
@@ -202,16 +231,9 @@ struct ContentView: View {
     /// top meniscus ears so the inner 640pt card body and all child elements sit at identical
     /// screen coordinates in both Dynamic Island and Non-Dynamic Island modes.
     private var openOuterEarWidth: CGFloat {
-        isDynamicIslandActive ? 0 : topCornerRadius
-    }
-
-    private var currentNotchShape: NotchShape {
-        NotchShape(
-            topCornerRadius: topCornerRadius,
-            bottomCornerRadius: bottomCornerRadius,
-            liquidCurve: liquidGlassNotch,
-            islandMorph: islandMorph
-        )
+        guard !dynamicIslandShape else { return 0 }
+        guard Defaults[.cornerRadiusScaling] else { return cornerRadiusInsets.closed.top }
+        return liquidGlassNotch ? openNotchEarMaxInset : cornerRadiusInsets.opened.top
     }
 
     private var computedChinWidth: CGFloat {
@@ -273,6 +295,18 @@ struct ContentView: View {
             && hasActiveMusicLyrics
     }
 
+    private var isShowingClosedAIUsageSummaryInCenter: Bool {
+        let isShowingMusicLiveActivity = (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
+            && (musicManager.isPlaying || !musicManager.isPlayerIdle)
+            && coordinator.musicLiveActivityEnabled
+        return vm.notchState == .closed
+            && !hasPhysicalNotch
+            && !coordinator.expandingView.show
+            && enableAIUsageNotchTab
+            && !vm.hideOnClosed
+            && !isShowingMusicLiveActivity
+    }
+
     private var shouldShowFluidMusicRim: Bool {
         enableAIUsageNotchTab && musicManager.isPlaying
     }
@@ -292,10 +326,10 @@ struct ContentView: View {
         // Unified open insets: both Hanging Notch and Dynamic Island share identical inner
         // content coordinates (d = 14pt scaled / 10pt unscaled from the 640×226 main card body).
         let openHorizontalPadding: CGFloat = openConcentricInset + openOuterEarWidth
-        let openOuterWidth: CGFloat = vm.notchSize.width + openOuterEarWidth * 2
+        let openOuterWidth: CGFloat = openNotchSize.width + openOuterEarWidth * 2
         // Concentric closed inset: d_horizontal == d_vertical == (H_closed - side) / 2 from
         // the visible outer side edge (with ear offset in Hanging Notch mode).
-        let closedSideClearance: CGFloat = max(4, (closedVisualHeight - closedLiveActivitySide) / 2)
+        let closedSideClearance: CGFloat = max(2, (closedVisualHeight - closedLiveActivitySide) / 2)
         let closedHorizontalPadding: CGFloat = isDynamicIslandActive
             ? closedSideClearance
             : (cornerRadiusInsets.closed.top + closedSideClearance)
@@ -318,24 +352,22 @@ struct ContentView: View {
                         .bottom,
                         vm.notchState == .open ? openBottomInnerPadding : 0
                     )
-                    .frame(
-                        width: vm.notchState == .open ? openOuterWidth : nil,
-                        height: vm.notchState == .open ? vm.notchSize.height : nil,
-                        alignment: .top
-                    )
-                    .clipShape(currentNotchShape)
-                    .background(
-                        NotchGlassBackground(
-                            isOpen: vm.notchState == .open,
-                            useLiquidGlass: liquidGlassNotch,
-                            topCornerRadius: topCornerRadius,
-                            bottomCornerRadius: bottomCornerRadius,
-                            islandMorph: islandMorph,
-                            physicalNotchSize: vm.physicalNotchSize,
-                            isVisible: isNotchVisible,
-                            showRim: false
-                        )
-                    )
+                    .modifier(NotchCardSurface(
+                        openProgress: vm.notchState == .open ? 1 : 0,
+                        topCornerRadius: topCornerRadius,
+                        bottomCornerRadius: bottomCornerRadius,
+                        islandMorph: islandMorph,
+                        isOpen: vm.notchState == .open,
+                        openSize: CGSize(width: openOuterWidth, height: openNotchSize.height),
+                        fallbackClosedSize: CGSize(width: vm.closedNotchSize.width, height: closedVisualHeight),
+                        useLiquidGlass: liquidGlassNotch,
+                        useNativeIslandBackdrop: dynamicIslandShape && !hasPhysicalNotch,
+                        physicalNotchSize: vm.physicalNotchSize,
+                        isVisible: isNotchVisible,
+                        showBaseGlassRim: showBaseGlassRim,
+                        showFluidMusicRim: showFluidRim,
+                        themeColor: musicManager.avgColor
+                    ))
                     .conditionalModifier(!liquidGlassNotch) { view in
                         view
                             .shadow(
@@ -344,33 +376,23 @@ struct ContentView: View {
                                 radius: Defaults[.cornerRadiusScaling] ? 6 : 4
                             )
                     }
-                    .overlay {
-                        if liquidGlassNotch || enableAIUsageNotchTab {
-                            NotchLiquidGlassRim(
-                                isOpen: vm.notchState == .open,
-                                topCornerRadius: topCornerRadius,
-                                bottomCornerRadius: bottomCornerRadius,
-                                liquidCurve: liquidGlassNotch,
-                                islandMorph: islandMorph,
-                                showBaseGlassRim: showBaseGlassRim,
-                                showFluidMusicRim: showFluidRim,
-                                outwardMusicGlow: hasPhysicalNotch,
-                                themeColor: musicManager.avgColor
-                            )
-                        }
-                    }
                     .overlay(alignment: .top) {
-                        if !liquidGlassNotch {
+                        if !liquidGlassNotch && !isFloatingDynamicIsland {
                             Rectangle()
                                 .fill(.black)
                                 .frame(height: 1)
                                 .padding(.horizontal, topCornerRadius)
-                        } else if let physicalWidth = vm.physicalNotchSize?.width, physicalWidth > 0, isNotchVisible {
+                        } else if let physicalWidth = vm.physicalNotchSize?.width,
+                                  physicalWidth > 0,
+                                  isNotchVisible,
+                                  effectiveDynamicIslandTopOffset <= 0
+                        {
                             Rectangle()
                                 .fill(.black)
                                 .frame(width: physicalWidth, height: 1)
                         }
                     }
+                    .padding(.top, dynamicIslandTopPadding)
                     .padding(
                         .bottom,
                         vm.effectiveClosedNotchHeight == 0 && vm.notchState == .closed ? 10 : 0
@@ -498,11 +520,13 @@ struct ContentView: View {
                     showBottomEdgeOpenLyrics: showBottomEdgeOpenLyrics,
                     isLiquidGlass: liquidGlassNotch,
                     gestureProgress: gestureProgress,
-                    isClosedInlineInNotch: !hasPhysicalNotch
+                    isClosedInlineInNotch: !hasPhysicalNotch,
+                    topOffset: dynamicIslandTopPadding
                 )
             }
             .allowsHitTesting(false)
         }
+        .offset(y: dynamicIslandNegativeYOffset)
         .conditionalModifier(gestureProgress != 0 || !liquidGlassNotch) { view in
             view.compositingGroup()
         }
@@ -536,7 +560,7 @@ struct ContentView: View {
             if isTargeted {
                 if vm.notchState == .closed {
                     coordinator.currentView = .shelf
-                    doOpen()
+                    doOpen(usePointerSideTab: false)
                 }
                 return
             }
@@ -605,7 +629,7 @@ struct ContentView: View {
                         }
                         .frame(height: closedRowHeight, alignment: .center)
                       } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && vm.notchState == .closed {
-                          InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
+                          InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress, rowHeight: closedRowHeight)
                               .transition(.opacity)
                       } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed {
                           MusicLiveActivity()
@@ -676,10 +700,8 @@ struct ContentView: View {
                         NotchAIUsageView()
                     }
                 }
-                .transition(
-                    .scale(scale: 0.88, anchor: .top)
-                    .combined(with: .opacity)
-                )
+                // The outer card already animates layout; a second scale makes the body drift.
+                .transition(.opacity)
                 .zIndex(1)
                 .allowsHitTesting(vm.notchState == .open)
                 .opacity(gestureProgress != 0 ? 1.0 - min(abs(gestureProgress) * 0.1, 0.3) : 1.0)
@@ -689,17 +711,38 @@ struct ContentView: View {
     }
 
     @ViewBuilder
+    private func closedAlbumArtThumbnail(side: CGFloat) -> some View {
+        let closedInset = max(4, (closedVisualHeight - side) / 2)
+        let closedArtRadius: CGFloat = isDynamicIslandActive
+            ? (side / 2)
+            : max(4, cornerRadiusInsets.closed.bottom - closedInset)
+        Image(nsImage: musicManager.albumArt)
+            .resizable()
+            .clipped()
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: closedArtRadius,
+                    style: .continuous
+                )
+            )
+            .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
+            .frame(
+                width: side,
+                height: side
+            )
+    }
+
+    @ViewBuilder
     func AIUsageClosedLiveActivity() -> some View {
         let side = closedLiveActivitySide
         HStack {
-            ClosedNotchAIUsageProviderIconView(containerSide: side)
-                .frame(width: side, height: side, alignment: .center)
+            closedAlbumArtThumbnail(side: side)
 
             Rectangle()
                 .fill(liquidGlassNotch ? .clear : .black)
                 .overlay {
                     if !hasPhysicalNotch {
-                        ClosedNotchAIUsageSummaryView()
+                        ClosedNotchAIUsageSummaryView(closedHeight: closedVisualHeight)
                     }
                 }
                 .frame(width: vm.closedNotchSize.width + -cornerRadiusInsets.closed.top)
@@ -741,25 +784,8 @@ struct ContentView: View {
     @ViewBuilder
     func MusicLiveActivity() -> some View {
         let side = closedLiveActivitySide
-        let closedInset = max(4, (closedVisualHeight - side) / 2)
-        let closedArtRadius: CGFloat = isDynamicIslandActive
-            ? (side / 2)
-            : max(4, cornerRadiusInsets.closed.bottom - closedInset)
         HStack {
-            Image(nsImage: musicManager.albumArt)
-                .resizable()
-                .clipped()
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: closedArtRadius,
-                        style: .continuous
-                    )
-                )
-                .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-                .frame(
-                    width: side,
-                    height: side
-                )
+            closedAlbumArtThumbnail(side: side)
 
             Rectangle()
                 .fill(liquidGlassNotch ? .clear : .black)
@@ -829,7 +855,10 @@ struct ContentView: View {
                         .matchedGeometryEffect(id: "spectrum", in: albumArtNamespace)
                         .mask {
                             AudioSpectrumView(isPlaying: $musicManager.isPlaying)
-                                .frame(width: 16, height: 12)
+                                .frame(
+                                    width: min(22, max(10, side * 0.85)),
+                                    height: min(16, max(8, side * 0.65))
+                                )
                         }
                 } else {
                     LottieAnimationContainer()
@@ -867,7 +896,47 @@ struct ContentView: View {
         }
     }
 
-    private func doOpen() {
+    private func preferredTabForPointerLocation(
+        _ mouseLocation: NSPoint = NSEvent.mouseLocation
+    ) -> NotchViews? {
+        guard enableAIUsageNotchTab,
+              !coordinator.openLastTabByDefault,
+              let screenFrame = getScreenFrame(vm.screenUUID) ?? NSScreen.main?.frame
+        else {
+            return nil
+        }
+
+        let centerWidth: CGFloat = isInlineMusicSneakPeekActive
+            ? 380
+            : max(0, vm.closedNotchSize.width - cornerRadiusInsets.closed.top)
+        let centerHalfWidth = centerWidth / 2
+        let offsetFromCenter = mouseLocation.x - screenFrame.midX
+
+        if offsetFromCenter < -centerHalfWidth {
+            return .home
+        }
+        if offsetFromCenter > centerHalfWidth {
+            return .aiUsage
+        }
+
+        // Pointer is in the center region: match what is currently displayed in the center.
+        if shouldShowClosedLyricsInNotch || shouldShowClosedLyricsBelowNotch || isInlineMusicSneakPeekActive {
+            return .home
+        }
+        if isShowingClosedAIUsageSummaryInCenter {
+            return .aiUsage
+        }
+
+        return offsetFromCenter >= 0 ? .aiUsage : .home
+    }
+
+    private func doOpen(usePointerSideTab: Bool = true) {
+        if usePointerSideTab,
+           vm.notchState == .closed,
+           let targetTab = preferredTabForPointerLocation()
+        {
+            coordinator.currentView = targetTab
+        }
         withAnimation(NotchLyricMotion.openAnimation) {
             vm.open()
         }

@@ -5,16 +5,27 @@
 //
 
 import SwiftUI
+import Defaults
 
 /// Shared motion timing constants and curves synchronizing the notch expansion,
 /// album-art thumbnail `matchedGeometryEffect`, and unified lyric flight so every
 /// element arrives on the exact same frame.
 enum NotchLyricMotion {
-    static let openFlightDuration: Double = 0.38
-    static let closeFlightDuration: Double = 0.36
+    static var animationSpeed: Double {
+        let speed = Defaults[.developerAnimationSpeed]
+        return speed.isFinite ? min(2, max(0.1, speed)) : 1
+    }
 
-    static let openAnimation = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: openFlightDuration)
-    static let closeAnimation = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: closeFlightDuration)
+    static var openFlightDuration: Double { 0.38 / animationSpeed }
+    static var closeFlightDuration: Double { 0.36 / animationSpeed }
+
+    static var openAnimation: Animation {
+        .timingCurve(0.22, 1.0, 0.36, 1.0, duration: openFlightDuration)
+    }
+
+    static var closeAnimation: Animation {
+        .timingCurve(0.22, 1.0, 0.36, 1.0, duration: closeFlightDuration)
+    }
 }
 
 /// Anchors reported by the closed-notch lyric slot (below the notch) and the
@@ -45,6 +56,13 @@ private enum NotchLyricDisplayMode: Equatable {
     case openBottomEdge
 }
 
+private enum LyricScrollPhase: Equatable {
+    case idle
+    case leadingHold
+    case scrolling
+    case trailingHold
+}
+
 /// Single continuously-mounted lyric view rendered in the fixed `windowSize` overlay of
 /// `ContentView`, smoothly translating between the closed-notch strip below the notch,
 /// the expanded-notch bottom edge (when on non-Home tabs), and the expanded-notch slot
@@ -62,6 +80,7 @@ struct NotchUnifiedLyricOverlay: View {
     let isLiquidGlass: Bool
     let gestureProgress: CGFloat
     var isClosedInlineInNotch: Bool = false
+    var topOffset: CGFloat = 0
 
     @State private var settledClosedRect: CGRect = .zero
     @State private var settledOpenRect: CGRect = .zero
@@ -74,7 +93,7 @@ struct NotchUnifiedLyricOverlay: View {
     @State private var wasVisible: Bool = false
     @State private var measuredTextWidth: CGFloat = 0
     @State private var marqueeOffset: CGFloat = 0
-    @State private var isScrolling: Bool = false
+    @State private var scrollPhase: LyricScrollPhase = .idle
     @State private var marqueeTask: Task<Void, Never>?
 
     private let openAnimation = NotchLyricMotion.openAnimation
@@ -110,7 +129,7 @@ struct NotchUnifiedLyricOverlay: View {
         let height: CGFloat = 20
         return CGRect(
             x: (proxy.size.width - width) / 2,
-            y: openNotchSize.height,
+            y: openNotchSize.height + topOffset,
             width: width,
             height: height
         )
@@ -194,23 +213,31 @@ struct NotchUnifiedLyricOverlay: View {
                 TimelineView(.periodic(from: .now, by: 0.1)) { timeline in
                     let line = currentLyricLine(at: timeline.date)
                     let isPersian = containsPersianCharacters(line)
+                    let baseFontSize = NSFont.preferredFont(forTextStyle: .subheadline).pointSize
+                    let adaptiveFontSize: CGFloat = (!isOpen && isClosedInlineInNotch && targetRect.height > 0 && targetRect.height < 20)
+                        ? max(8.5, targetRect.height * 0.56)
+                        : baseFontSize
                     let font: Font = isPersian
-                        ? .custom("Vazirmatn-Regular", size: NSFont.preferredFont(forTextStyle: .subheadline).pointSize)
-                        : .subheadline
+                        ? .custom("Vazirmatn-Regular", size: adaptiveFontSize)
+                        : .system(size: adaptiveFontSize)
                     let activeContainerWidth = targetRect.width
-                    let needsMarquee = isInlineOpen && measuredTextWidth > activeContainerWidth + 2
+                    let isOverflowing = measuredTextWidth > activeContainerWidth + 2
+                    let needsInlineMarquee = isInlineOpen && isOverflowing
+                    let needsClosedScroll = !isInlineOpen && isOverflowing
 
                     NotchLyricFlightView(
                         rect: targetRect,
                         inlineProgress: targetInlineProgress,
                         measuredTextWidth: measuredTextWidth,
-                        needsMarquee: needsMarquee,
+                        needsInlineMarquee: needsInlineMarquee,
+                        needsClosedScroll: needsClosedScroll,
+                        scrollPhase: scrollPhase,
                         marqueeOffset: marqueeOffset
                     ) {
                         ZStack(alignment: .leading) {
-                            lyricTextView(line: line, font: font, needsMarquee: needsMarquee)
+                            lyricTextView(line: line, font: font, needsMarquee: isOverflowing)
                                 .overlay(alignment: .leading) {
-                                    if needsMarquee {
+                                    if needsInlineMarquee {
                                         lyricTextView(line: line, font: font, needsMarquee: true)
                                             .offset(x: measuredTextWidth + 24)
                                     }
@@ -230,16 +257,54 @@ struct NotchUnifiedLyricOverlay: View {
                                 GeometryReader { textGeo in
                                     Color.clear
                                         .onAppear {
-                                            updateMeasuredWidth(textGeo.size.width, line: line, containerWidth: activeContainerWidth)
+                                            updateMeasuredWidth(
+                                                textGeo.size.width,
+                                                line: line,
+                                                containerWidth: activeContainerWidth,
+                                                at: timeline.date
+                                            )
                                         }
                                         .onChange(of: textGeo.size.width) { _, newWidth in
-                                            updateMeasuredWidth(newWidth, line: line, containerWidth: activeContainerWidth)
+                                            updateMeasuredWidth(
+                                                newWidth,
+                                                line: line,
+                                                containerWidth: activeContainerWidth,
+                                                at: timeline.date
+                                            )
                                         }
                                         .onChange(of: line) { _, newLine in
-                                            updateMeasuredWidth(textGeo.size.width, line: newLine, containerWidth: activeContainerWidth)
+                                            updateMeasuredWidth(
+                                                textGeo.size.width,
+                                                line: newLine,
+                                                containerWidth: activeContainerWidth,
+                                                at: timeline.date
+                                            )
                                         }
-                                        .onChange(of: isInlineOpen) { _, _ in
-                                            updateMeasuredWidth(textGeo.size.width, line: line, containerWidth: activeContainerWidth)
+                                        .onChange(of: displayMode) { _, _ in
+                                            updateMeasuredWidth(
+                                                textGeo.size.width,
+                                                line: line,
+                                                containerWidth: activeContainerWidth,
+                                                at: timeline.date
+                                            )
+                                        }
+                                        .onChange(of: activeContainerWidth) { oldWidth, newWidth in
+                                            guard abs(newWidth - oldWidth) > 0.5 else { return }
+                                            updateMeasuredWidth(
+                                                textGeo.size.width,
+                                                line: line,
+                                                containerWidth: newWidth,
+                                                at: timeline.date
+                                            )
+                                        }
+                                        .onChange(of: isVisible) { _, visible in
+                                            guard visible else { return }
+                                            updateMeasuredWidth(
+                                                textGeo.size.width,
+                                                line: line,
+                                                containerWidth: activeContainerWidth,
+                                                at: timeline.date
+                                            )
                                         }
                                 }
                             }
@@ -360,31 +425,76 @@ struct NotchUnifiedLyricOverlay: View {
             .animation(.easeInOut(duration: musicManager.syncedLyrics.isEmpty ? 0.5 : 0.28), value: line)
     }
 
-    private func updateMeasuredWidth(_ width: CGFloat, line: String, containerWidth: CGFloat) {
+    private func updateMeasuredWidth(
+        _ width: CGFloat,
+        line: String,
+        containerWidth: CGFloat,
+        at date: Date
+    ) {
         measuredTextWidth = width
         marqueeTask?.cancel()
         marqueeTask = nil
 
-        let shouldScroll = isInlineOpen && width > containerWidth + 2 && !line.isEmpty
+        let overflow = width - containerWidth
+        let shouldScroll = overflow > 2 && !line.isEmpty && containerWidth > 0
         guard shouldScroll else {
-            withAnimation(.easeOut(duration: 0.2)) {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
                 marqueeOffset = 0
-                isScrolling = false
+                scrollPhase = .idle
             }
             return
         }
 
-        marqueeOffset = 0
-        isScrolling = false
-        let travelDistance = width + 24
-        let duration = max(3.0, Double(travelDistance / 32.0))
+        var resetTransaction = Transaction()
+        resetTransaction.disablesAnimations = true
+        withTransaction(resetTransaction) {
+            marqueeOffset = 0
+            scrollPhase = .leadingHold
+        }
 
-        marqueeTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.8))
-            guard !Task.isCancelled else { return }
-            isScrolling = true
-            withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
-                marqueeOffset = -travelDistance
+        if isInlineOpen {
+            let travelDistance = width + 24
+            let duration = max(3.0, Double(travelDistance / 32.0))
+
+            marqueeTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.8))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    scrollPhase = .scrolling
+                }
+                withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
+                    marqueeOffset = -travelDistance
+                }
+            }
+        } else {
+            let elapsed = musicManager.estimatedPlaybackPosition(at: date)
+            let rawWindow = musicManager.lyricLineRemainingDuration(at: elapsed) ?? 6.0
+            let effectiveWindow = min(12.0, max(1.2, rawWindow))
+            let leadDelay = min(0.65, max(0.22, effectiveWindow * 0.16))
+            let tailHold = min(0.55, max(0.20, effectiveWindow * 0.14))
+            let availableScroll = max(0.75, effectiveWindow - leadDelay - tailHold)
+
+            // Smooth readable pace (28...140 pt/s) timed to reveal the full line before the next lyric
+            let minDuration = Double(overflow) / 140.0
+            let maxDuration = Double(overflow) / 28.0
+            let scrollDuration = max(0.55, min(maxDuration, max(minDuration, availableScroll)))
+
+            marqueeTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(leadDelay))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    scrollPhase = .scrolling
+                }
+                withAnimation(.timingCurve(0.25, 0.0, 0.75, 1.0, duration: scrollDuration)) {
+                    marqueeOffset = -overflow
+                }
+                try? await Task.sleep(for: .seconds(scrollDuration))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    scrollPhase = .trailingHold
+                }
             }
         }
     }
@@ -433,7 +543,9 @@ private struct NotchLyricFlightView<Content: View>: View, Animatable {
     var boxHeight: CGFloat
     var inlineProgress: CGFloat
     let measuredTextWidth: CGFloat
-    let needsMarquee: Bool
+    let needsInlineMarquee: Bool
+    let needsClosedScroll: Bool
+    let scrollPhase: LyricScrollPhase
     let marqueeOffset: CGFloat
     let content: Content
 
@@ -441,7 +553,9 @@ private struct NotchLyricFlightView<Content: View>: View, Animatable {
         rect: CGRect,
         inlineProgress: CGFloat,
         measuredTextWidth: CGFloat,
-        needsMarquee: Bool,
+        needsInlineMarquee: Bool,
+        needsClosedScroll: Bool,
+        scrollPhase: LyricScrollPhase,
         marqueeOffset: CGFloat,
         @ViewBuilder content: () -> Content
     ) {
@@ -451,7 +565,9 @@ private struct NotchLyricFlightView<Content: View>: View, Animatable {
         self.boxHeight = rect.height
         self.inlineProgress = inlineProgress
         self.measuredTextWidth = measuredTextWidth
-        self.needsMarquee = needsMarquee
+        self.needsInlineMarquee = needsInlineMarquee
+        self.needsClosedScroll = needsClosedScroll
+        self.scrollPhase = scrollPhase
         self.marqueeOffset = marqueeOffset
         self.content = content()
     }
@@ -480,18 +596,64 @@ private struct NotchLyricFlightView<Content: View>: View, Animatable {
         let clampedWidth = max(1, boxWidth)
         let clampedHeight = max(1, boxHeight)
 
-        // Smoothly interpolate horizontal alignment between centered (closed / bottom edge) and leading (open Home)
+        // Smoothly interpolate horizontal alignment between centered (or scrolled closed/bottom edge)
+        // and leading (open Home).
         let centeredTextOffsetX = measuredTextWidth > 0
             ? max(0.0, (clampedWidth - measuredTextWidth) / 2.0)
             : 0.0
-        let inlineTextOffsetX = needsMarquee ? marqueeOffset : 0.0
-        let textOffsetX = centeredTextOffsetX * (1.0 - p) + inlineTextOffsetX * p
+        let closedTextOffsetX = needsClosedScroll ? marqueeOffset : centeredTextOffsetX
+        let inlineTextOffsetX = needsInlineMarquee ? marqueeOffset : 0.0
+        let textOffsetX = closedTextOffsetX * (1.0 - p) + inlineTextOffsetX * p
         let closedShadowStrength = Double(1.0 - p)
+
+        let isOverflowScrolling = needsClosedScroll || needsInlineMarquee
+        let edgeFade = min(10, clampedWidth * 0.12)
+        let leadingFadeWidth: CGFloat = {
+            guard isOverflowScrolling else { return 0 }
+            switch scrollPhase {
+            case .scrolling, .trailingHold:
+                return edgeFade
+            case .idle, .leadingHold:
+                return 0
+            }
+        }()
+        let trailingFadeWidth: CGFloat = {
+            guard isOverflowScrolling else { return 0 }
+            if needsClosedScroll && scrollPhase == .trailingHold {
+                return 0
+            }
+            return edgeFade
+        }()
 
         content
             .offset(x: textOffsetX)
             .frame(width: clampedWidth, height: clampedHeight, alignment: .leading)
             .clipped()
+            .mask {
+                if isOverflowScrolling {
+                    HStack(spacing: 0) {
+                        if leadingFadeWidth > 0 {
+                            LinearGradient(
+                                colors: [.clear, .black],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(width: leadingFadeWidth)
+                        }
+                        Color.black
+                        if trailingFadeWidth > 0 {
+                            LinearGradient(
+                                colors: [.black, .clear],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(width: trailingFadeWidth)
+                        }
+                    }
+                } else {
+                    Color.black
+                }
+            }
             .shadow(
                 color: .black.opacity(0.8 * closedShadowStrength),
                 radius: 1,

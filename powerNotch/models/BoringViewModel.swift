@@ -196,8 +196,17 @@ class BoringViewModel: NSObject, ObservableObject {
     func isMouseHovering(position: NSPoint = NSEvent.mouseLocation) -> Bool {
         let screenFrame = getScreenFrame(screenUUID)
         if let frame = screenFrame {
-            
-            let baseY = frame.maxY - notchSize.height
+            var topOffset: CGFloat = 0
+            if Defaults[.dynamicIslandShape],
+               let uuid = screenUUID,
+               let screen = NSScreen.screen(withUUID: uuid)
+            {
+                let defaultInset = DisplayNotchSettings.defaultDynamicIslandTopInset(for: screen)
+                let customOffset = CGFloat(DisplayNotchSettings.tuning(forUUID: uuid).verticalOffset)
+                topOffset = max(0, defaultInset + customOffset)
+            }
+
+            let baseY = frame.maxY - topOffset - notchSize.height
             let baseX = frame.midX - notchSize.width / 2
             
             return position.y >= baseY && position.y <= frame.maxY + 1 && position.x >= baseX && position.x <= baseX + notchSize.width
@@ -229,12 +238,15 @@ class BoringViewModel: NSObject, ObservableObject {
         self.coordinator.sneakPeek.show = false
         self.edgeAutoOpenActive = false
 
-        // Set the current view to shelf if it contains files and the user enables openShelfByDefault
-        // Otherwise, if the user has not enabled openLastShelfByDefault, set the view to home
-    if !ShelfStateViewModel.shared.isEmpty && Defaults[.openShelfByDefault] {
-            coordinator.currentView = .shelf
-        } else if !coordinator.openLastTabByDefault {
-            coordinator.currentView = .home
+        // Preserve the last tab when "Remember last tab" is enabled.
+        // Otherwise, switch to shelf if it contains files and openShelfByDefault is enabled,
+        // or reset to home.
+        if !coordinator.openLastTabByDefault {
+            if !ShelfStateViewModel.shared.isEmpty && Defaults[.openShelfByDefault] {
+                coordinator.currentView = .shelf
+            } else {
+                coordinator.currentView = .home
+            }
         }
     }
 
