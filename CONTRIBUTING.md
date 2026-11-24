@@ -40,8 +40,8 @@ Please submit all translations to [Crowdin](https://crowdin.com/project/power-no
 
 2. **Clone your fork**:
    ```bash
-   git clone https://github.com/{your-username}/powerNotch.git
-   cd powerNotch
+   git clone https://github.com/{your-username}/power.notch.git
+   cd power.notch
    ```
    Replace `{your-username}` with your GitHub username.
 

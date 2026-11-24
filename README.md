@@ -84,6 +84,14 @@ Download the latest `.dmg` from the [Releases](https://github.com/Shaun-Z/power.
 3. **Build and run:**
    - Select the `powerNotch` scheme and press `Cmd + R`.
 
+### Homebrew tap
+
+Once the release and [Shaun-Z/homebrew-tap](https://github.com/Shaun-Z/homebrew-tap) are published, install with:
+
+```bash
+brew install --cask Shaun-Z/tap/power-notch
+```
+
 ## Usage
 
 - Launch **powerNotch** to activate the notch experience.
@@ -121,6 +129,25 @@ The glass background, outline, and content clipping share the same animated surf
 ## Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a pull request.
+
+Run `swift test` from the repository root for AI usage regression tests. The Swift Testing target compiles the same Foundation-only history models, Codex event parser, and refresh coordinator used by the app, without launching it or accessing local credentials. The normal push/PR build and shared release build use Xcode 26.6.
+
+AI usage history attributes Codex token increments to each event's local calendar day. Thread-level SQLite totals are excluded because they cannot establish daily usage. Cost history preserves currency and source: charts prefer balance-derived spend and otherwise show USD API-equivalent estimates with `≈`. A chart uses one currency and source across the entire period; missing observations are not filled with estimates from a different source. Legacy ledger costs without currency metadata are omitted rather than relabeled.
+
+### Publishing a release
+
+Prepare exactly one open, mergeable `dev` → `main` release PR in this repository, then run **Actions → Deploy powerNotch → Run workflow** from `main`, with version `0.1.0` for the first release. The workflow builds the PR's exact head commit and uses its title and body as release notes. Stable releases merge that PR before publication. Existing draft releases can be resumed from their original build source.
+
+The release workflow uploads `powerNotch.dmg` to [Shaun-Z/power.notch](https://github.com/Shaun-Z/power.notch/releases), updates `updater/appcast.xml`, and writes the version and downloaded DMG's SHA-256 to `Casks/power-notch.rb` in `Shaun-Z/homebrew-tap`. Create that public tap repository with an initial commit (for example, a README) before publishing; the workflow creates the `Casks` directory.
+
+Configure these GitHub Actions values in the app repository:
+
+- Variables: `DEVELOPMENT_TEAM_ID`, `RELEASE_APP_CLIENT_ID`.
+- Secrets: `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`, `KEYCHAIN_PASSWORD`, `RELEASE_APP_PRIVATE_KEY`, `PRIVATE_SPARKLE_KEY`.
+- Install the release GitHub App on both `power.notch` and `homebrew-tap`, with Contents write access, and grant Pull requests write access for the release PR in `power.notch`.
+- Ensure `PRIVATE_SPARKLE_KEY` matches `SUPublicEDKey` in `powerNotch/Info.plist`. The private key is never committed to this repository.
+
+The app reads the update feed directly from `https://raw.githubusercontent.com/Shaun-Z/power.notch/main/updater/appcast.xml`, so application updates do not require GitHub Pages. The checked-in feed starts empty; the release workflow adds the signed enclosure for the actual build. The current build workflow uses Apple Development signing and does not notarize the app; publishing does not change that signing policy.
 
 ## Acknowledgments
 

@@ -35,7 +35,7 @@ body:
         What version of our software are you running? (Go to ✦ in the menu bar >
         Settings > About). The "Report a Bug" button in the About pane prefills
         the exact version, build number, and update channel.
-      placeholder: "v2.7.3 (build 274, beta channel)"
+      placeholder: "v0.1.0 (build 272, stable channel)"
     validations:
       required: true
   - type: input

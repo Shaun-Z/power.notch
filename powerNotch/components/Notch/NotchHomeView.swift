@@ -29,6 +29,8 @@ struct MusicPlayerView: View {
 struct AlbumArtView: View {
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var vm: BoringViewModel
+    @Default(.mediaColorStyle) private var mediaColorStyle
+    @Default(.customMediaColorData) private var customMediaColorData
     let albumArtNamespace: Namespace.ID
 
     /// Concentric inner corner radius (R_outer - d = 28 - 14 = 14pt scaled, 24 - 10 = 14pt unscaled)
@@ -36,25 +38,37 @@ struct AlbumArtView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            if Defaults[.lightingEffect] {
-                albumArtBackground
-            }
+            albumArtBackground
             albumArtButton
         }
     }
 
+    @ViewBuilder
     private var albumArtBackground: some View {
-        Image(nsImage: musicManager.albumArt)
-            .resizable()
-            .clipped()
-            .clipShape(
-                RoundedRectangle(cornerRadius: artCornerRadius, style: .continuous)
-            )
-            .aspectRatio(1, contentMode: .fit)
-            .scaleEffect(x: 1.3, y: 1.4)
-            .rotationEffect(.degrees(92))
-            .blur(radius: 40)
-            .opacity(musicManager.isPlaying ? 0.5 : 0)
+        switch mediaColorStyle {
+        case .systemDefault:
+            EmptyView()
+        case .albumArt:
+            Image(nsImage: musicManager.albumArt)
+                .resizable()
+                .clipped()
+                .clipShape(
+                    RoundedRectangle(cornerRadius: artCornerRadius, style: .continuous)
+                )
+                .aspectRatio(1, contentMode: .fit)
+                .scaleEffect(x: 1.3, y: 1.4)
+                .rotationEffect(.degrees(92))
+                .blur(radius: 40)
+                .opacity(musicManager.isPlaying ? 0.5 : 0)
+        case .custom:
+            RoundedRectangle(cornerRadius: artCornerRadius, style: .continuous)
+                .fill(Color(nsColor: MediaColorStyle.resolvedCustomNSColor(from: customMediaColorData)))
+                .aspectRatio(1, contentMode: .fit)
+                .scaleEffect(x: 1.3, y: 1.4)
+                .rotationEffect(.degrees(92))
+                .blur(radius: 40)
+                .opacity(musicManager.isPlaying ? 0.45 : 0)
+        }
     }
 
     private var albumArtButton: some View {
@@ -122,6 +136,7 @@ struct AlbumArtView: View {
 }
 
 struct MusicControlsView: View {
+    @Environment(\.notchGlassInk) private var ink
     @ObservedObject var musicManager = MusicManager.shared
         @EnvironmentObject var vm: BoringViewModel
         @ObservedObject var webcamManager = WebcamManager.shared
@@ -157,16 +172,14 @@ struct MusicControlsView: View {
                 $musicManager.songTitle,
                 font: .headline,
                 nsFont: .headline,
-                textColor: .white,
+                textColor: ink.primary(1.0),
                 frameWidth: width
             )
             MarqueeText(
                 $musicManager.artistName,
                 font: .headline,
                 nsFont: .headline,
-                textColor: Defaults[.playerColorTinting]
-                    ? Color(nsColor: musicManager.avgColor)
-                        .ensureMinimumBrightness(factor: 0.6) : .gray,
+                textColor: ink.secondary(0.65),
                 frameWidth: width
             )
             .fontWeight(.medium)
@@ -323,6 +336,7 @@ private extension Array where Element == MusicControlButton {
 // MARK: - Volume Control View
 
 struct VolumeControlView: View {
+    @Environment(\.notchGlassInk) private var ink
     @ObservedObject var musicManager = MusicManager.shared
     @State private var volumeSliderValue: Double = 0.5
     @State private var dragging: Bool = false
@@ -341,7 +355,7 @@ struct VolumeControlView: View {
             }) {
                 Image(systemName: volumeIcon)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(musicManager.volumeControlSupported ? .white : .gray)
+                    .foregroundColor(musicManager.volumeControlSupported ? ink.primary(1.0) : ink.tertiary(0.45))
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(!musicManager.volumeControlSupported)
@@ -351,7 +365,7 @@ struct VolumeControlView: View {
                 CustomSlider(
                     value: $volumeSliderValue,
                     range: 0.0...1.0,
-                    color: .white,
+                    color: ink.primary(1.0),
                     dragging: $dragging,
                     lastDragged: .constant(Date.distantPast),
                     onValueChange: { newValue in
@@ -467,6 +481,9 @@ struct NotchHomeView: View {
 }
 
 struct MusicSliderView: View {
+    @Environment(\.notchGlassInk) private var ink
+    @Default(.mediaColorStyle) private var mediaColorStyle
+    @Default(.customMediaColorData) private var customMediaColorData
     @Binding var sliderValue: Double
     @Binding var duration: Double
     @Binding var lastDragged: Date
@@ -479,15 +496,24 @@ struct MusicSliderView: View {
     let isPlaying: Bool
     var onValueChange: (Double) -> Void
 
+    private var resolvedSliderColor: Color {
+        switch mediaColorStyle {
+        case .systemDefault:
+            return ink.primary(1.0)
+        case .albumArt:
+            return ink.tinted(color, darkMinBrightness: 0.8)
+        case .custom:
+            let custom = MediaColorStyle.resolvedCustomNSColor(from: customMediaColorData)
+            return ink.tinted(custom, darkMinBrightness: 0.8)
+        }
+    }
 
     var body: some View {
         VStack {
             CustomSlider(
                 value: $sliderValue,
                 range: 0...duration,
-                color: Defaults[.sliderColor] == SliderColorEnum.albumArt
-                    ? Color(nsColor: color).ensureMinimumBrightness(factor: 0.8)
-                    : Defaults[.sliderColor] == SliderColorEnum.accent ? .effectiveAccent : .white,
+                color: resolvedSliderColor,
                 dragging: $dragging,
                 lastDragged: $lastDragged,
                 onValueChange: onValueChange
@@ -500,10 +526,7 @@ struct MusicSliderView: View {
                 Text(timeString(from: duration))
             }
             .fontWeight(.medium)
-            .foregroundColor(
-                Defaults[.playerColorTinting]
-                    ? Color(nsColor: color).ensureMinimumBrightness(factor: 0.6) : .gray
-            )
+            .foregroundColor(ink.secondary(0.65))
             .font(.caption)
         }
         .onChange(of: currentDate) {
@@ -527,6 +550,7 @@ struct MusicSliderView: View {
 }
 
 struct CustomSlider: View {
+    @Environment(\.notchGlassInk) private var ink
     @Binding var value: Double
     var range: ClosedRange<Double>
     var color: Color = .white
@@ -546,7 +570,7 @@ struct CustomSlider: View {
 
             ZStack(alignment: .leading) {
                 Rectangle()
-                    .fill(.gray.opacity(0.3))
+                    .fill(ink.isClearGlass ? ink.track(0.22) : .gray.opacity(0.3))
                     .frame(height: height)
 
                 Rectangle()

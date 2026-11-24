@@ -197,8 +197,8 @@ class BoringViewModel: NSObject, ObservableObject {
         let screenFrame = getScreenFrame(screenUUID)
         if let frame = screenFrame {
             var topOffset: CGFloat = 0
-            if Defaults[.dynamicIslandShape],
-               let uuid = screenUUID,
+            if let uuid = screenUUID,
+               DisplayNotchSettings.usesDynamicIsland(forUUID: uuid),
                let screen = NSScreen.screen(withUUID: uuid)
             {
                 let defaultInset = DisplayNotchSettings.defaultDynamicIslandTopInset(for: screen)

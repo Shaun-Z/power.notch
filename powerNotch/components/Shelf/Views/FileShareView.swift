@@ -11,6 +11,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct FileShareView: View {
+    @Environment(\.notchGlassInk) private var ink
     @EnvironmentObject private var vm: BoringViewModel
     @StateObject private var quickShare = QuickShareService.shared
     @Default(.quickShareProvider) var quickShareProvider: String
@@ -45,28 +46,31 @@ struct FileShareView: View {
         ZStack {
             RoundedRectangle(cornerRadius: dropAreaCornerRadius, style: .continuous)
                 .fill(
-                    LinearGradient(colors: [Color.black.opacity(0.35), Color.black.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    LinearGradient(
+                        colors: ink.isClearGlass
+                            ? [Color.black.opacity(0.08), Color.black.opacity(0.04)]
+                            : [Color.black.opacity(0.35), Color.black.opacity(0.20)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: dropAreaCornerRadius, style: .continuous)
                         .stroke(
                             vm.dropZoneTargeting
                                 ? Color.accentColor.opacity(0.9)
-                                : Color.white.opacity(0.1),
+                                : ink.border(0.12),
                             style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [10])
                         )
                 )
-                .shadow(color: Color.black.opacity(0.6), radius: 6, x: 0, y: 2)
+                .shadow(color: Color.black.opacity(ink.isClearGlass ? 0.12 : 0.6), radius: 6, x: 0, y: 2)
 
             // Content
             VStack(spacing: 5) {
                 ZStack {
                     Circle()
-                        .fill(Color.white.opacity(
-                            vm.dropZoneTargeting ? 0.11 : 0.09
-                        ))
+                        .fill(ink.surface(vm.dropZoneTargeting ? 0.11 : 0.09))
                         .frame(width: 55, height: 55)
-                    Image(systemName: "square.and.arrow.up")
                     Group {
                         if let imgData = selectedProvider.imageData, let nsImg = NSImage(data: imgData) {
                             Image(nsImage: nsImg)
@@ -78,7 +82,7 @@ struct FileShareView: View {
                     }
                     .frame(width: 34, height: 34)
                         .foregroundStyle(
-                            vm.dropZoneTargeting ? Color.accentColor : Color.gray
+                            vm.dropZoneTargeting ? Color.accentColor : ink.secondary(0.65)
                         )
                         .scaleEffect(
                             vm.dropZoneTargeting ? 1.06 : 1.0
@@ -88,7 +92,7 @@ struct FileShareView: View {
 
                 Text(selectedProvider.id)
                     .font(.system(.headline, design: .rounded))
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(ink.primary(0.8))
 
             }
             .padding(18)
@@ -96,10 +100,10 @@ struct FileShareView: View {
             // Loading overlay
             if isProcessing || quickShare.isPickerOpen {
                 RoundedRectangle(cornerRadius: dropAreaCornerRadius, style: .continuous)
-                    .fill(.black.opacity(0.3))
+                    .fill(ink.isClearGlass ? Color.black.opacity(0.12) : Color.black.opacity(0.3))
                     .overlay(
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .progressViewStyle(CircularProgressViewStyle(tint: ink.primary(1.0)))
                             .scaleEffect(0.8)
                     )
             }

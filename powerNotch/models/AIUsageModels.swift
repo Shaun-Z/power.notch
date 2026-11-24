@@ -429,6 +429,7 @@ struct AIUsageRingGroup: Identifiable {
 }
 
 struct AIUsageDualRingGauge: View {
+    @Environment(\.notchGlassInk) private var ink
     let outerProgress: Double
     let innerProgress: Double
     let outerColor: Color
@@ -437,18 +438,20 @@ struct AIUsageDualRingGauge: View {
     let outerLineWidth: CGFloat
     let innerLineWidth: CGFloat
     let ringGap: CGFloat
-    var outerTrackColor: Color = Color.white.opacity(0.13)
-    var innerTrackColor: Color = Color.white.opacity(0.11)
+    var outerTrackColor: Color? = nil
+    var innerTrackColor: Color? = nil
 
     var body: some View {
         let clampedOuter = normalizedTrim(outerProgress)
         let clampedInner = normalizedTrim(innerProgress)
         let innerSize = max(8, size - (outerLineWidth + ringGap) * 2)
+        let resolvedOuterTrack = outerTrackColor ?? ink.track(0.13)
+        let resolvedInnerTrack = innerTrackColor ?? ink.track(0.11)
 
         ZStack {
             // Outer ring track (5h)
             Circle()
-                .stroke(outerTrackColor, lineWidth: outerLineWidth)
+                .stroke(resolvedOuterTrack, lineWidth: outerLineWidth)
                 .frame(width: size, height: size)
 
             // Outer ring fill (5h)
@@ -463,7 +466,7 @@ struct AIUsageDualRingGauge: View {
 
             // Inner ring track (Weekly)
             Circle()
-                .stroke(innerTrackColor, lineWidth: innerLineWidth)
+                .stroke(resolvedInnerTrack, lineWidth: innerLineWidth)
                 .frame(width: innerSize, height: innerSize)
 
             // Inner ring fill (Weekly)
@@ -489,13 +492,14 @@ struct AIUsageDualRingGauge: View {
 }
 
 struct AIUsageSingleRingGauge: View {
+    @Environment(\.notchGlassInk) private var ink
     let progress: Double
     let color: Color
     let centerLabel: String?
     let size: CGFloat
     let lineWidth: CGFloat
-    var trackColor: Color = Color.white.opacity(0.13)
-    var labelColor: Color = Color.white.opacity(0.92)
+    var trackColor: Color? = nil
+    var labelColor: Color? = nil
 
     var body: some View {
         let clamped: CGFloat = {
@@ -503,10 +507,12 @@ struct AIUsageSingleRingGauge: View {
             if v > 0 && v < 0.03 { return 0.03 }
             return CGFloat(v)
         }()
+        let resolvedTrack = trackColor ?? ink.track(0.13)
+        let resolvedLabel = labelColor ?? ink.primary(0.92)
 
         ZStack {
             Circle()
-                .stroke(trackColor, lineWidth: lineWidth)
+                .stroke(resolvedTrack, lineWidth: lineWidth)
 
             Circle()
                 .trim(from: 0, to: clamped)
@@ -519,7 +525,7 @@ struct AIUsageSingleRingGauge: View {
             if let centerLabel {
                 Text(centerLabel)
                     .font(.system(size: size >= 32 ? 8.5 : 7.5, weight: .bold, design: .monospaced))
-                    .foregroundStyle(labelColor)
+                    .foregroundStyle(resolvedLabel)
                     .minimumScaleFactor(0.75)
                     .lineLimit(1)
             }
@@ -607,6 +613,24 @@ struct AIUsageRateWindow: Identifiable, Codable, Equatable, Sendable {
             return "\(max(1, minutes))m"
         }
     }
+
+    var compactResetCountdownText: String? {
+        guard let resetAt else { return nil }
+        let remaining = resetAt.timeIntervalSinceNow
+        guard remaining > 0 else { return "Now" }
+        let totalMinutes = Int(remaining / 60)
+        let days = totalMinutes / (60 * 24)
+        let hours = (totalMinutes % (60 * 24)) / 60
+        let minutes = totalMinutes % 60
+
+        if days > 0 {
+            return hours > 0 ? "\(days)d\(hours)h" : "\(days)d"
+        } else if hours > 0 {
+            return minutes > 0 ? "\(hours)h\(minutes)m" : "\(hours)h"
+        } else {
+            return "\(max(1, minutes))m"
+        }
+    }
 }
 
 struct AIUsageCurrencyBalance: Identifiable, Codable, Equatable, Sendable {
@@ -619,6 +643,28 @@ struct AIUsageCurrencyBalance: Identifiable, Codable, Equatable, Sendable {
 
     var formattedRemaining: String {
         AIUsageBalance.formatAmount(remaining, currency: currency)
+    }
+
+    /// Concise formatted amount for the closed-notch right wing (e.g. "¥12.34", "$5.20", "720").
+    var compactClosedNotchAmount: String {
+        let upper = currency.uppercased()
+        if upper == "CREDITS" || upper == "PTS" || upper == "TOKENS" || upper == "TOK" {
+            if remaining >= 1_000_000_000 { return String(format: "%.1fB", remaining / 1_000_000_000) }
+            if remaining >= 1_000_000 { return String(format: "%.1fM", remaining / 1_000_000) }
+            if remaining >= 1_000 { return String(format: "%.1fK", remaining / 1_000) }
+            return String(format: "%.0f", remaining)
+        }
+        let symbol: String
+        switch upper {
+        case "CNY", "RMB": symbol = "¥"
+        case "USD": symbol = "$"
+        case "EUR": symbol = "€"
+        default: symbol = ""
+        }
+        if abs(remaining) >= 1_000 {
+            return String(format: "%@%.0f", symbol, remaining)
+        }
+        return String(format: "%@%.2f", symbol, remaining)
     }
 }
 

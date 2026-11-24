@@ -16,6 +16,7 @@ struct TabModel: Identifiable {
 }
 
 struct TabSelectionView: View {
+    @Environment(\.notchGlassInk) private var ink
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @ObservedObject var tvm = ShelfStateViewModel.shared
     @Default(.liquidGlassNotch) private var liquidGlassNotch
@@ -80,8 +81,8 @@ struct TabSelectionView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.28),
-                            Color.white.opacity(0.15)
+                            ink.surface(0.28),
+                            ink.surface(0.15)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -92,8 +93,8 @@ struct TabSelectionView: View {
                         .strokeBorder(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.42),
-                                    Color.white.opacity(0.10)
+                                    ink.border(0.42),
+                                    ink.border(0.10)
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -103,10 +104,10 @@ struct TabSelectionView: View {
                 }
         } else {
             Capsule()
-                .fill(Color.white.opacity(0.18))
+                .fill(ink.surface(0.18))
                 .overlay {
                     Capsule()
-                        .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5)
+                        .strokeBorder(ink.border(0.16), lineWidth: 0.5)
                 }
         }
     }

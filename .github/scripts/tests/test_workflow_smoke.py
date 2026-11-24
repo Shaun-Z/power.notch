@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Structural smoke tests for the nightly release pipeline.
+"""Structural smoke tests and isolated shell tests for release pipelines.
 
-The workflows cannot execute under unit test; these checks pin the nightly
+GitHub API calls are mocked in shell tests; structural checks pin the nightly
 rolling-release invariants (fixed tag/asset/title, attestation, signed API
 commits) and the shared derive-don't-reserve build-number scheme that
 stable/beta follow too.
@@ -9,6 +9,10 @@ stable/beta follow too.
 
 from __future__ import annotations
 
+import os
+import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -31,6 +35,77 @@ class WorkflowSmokeTests(unittest.TestCase):
             encoding="utf-8"
         )
 
+    def run_release_state(self, response: str):
+        step = self.release.split("      - name: Determine release state\n", 1)[1]
+        block = step.split("        run: |\n", 1)[1].split("\n      - name:", 1)[0]
+        # Execute the actual workflow shell with a local gh substitute. No
+        # GitHub calls are made, including in unexpected branches.
+        mock = """
+        gh() {
+          if [[ "$1 $2" == "release view" ]]; then
+            case "$MOCK_RESPONSE" in
+              draft) printf '%s\\n' '{"isDraft":true,"targetCommitish":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}'; return 0 ;;
+              unavailable) echo 'HTTP 503' >&2; return 1 ;;
+              *) echo 'release not found' >&2; return 1 ;;
+            esac
+          fi
+          if [[ "$1" == "api" && "$MOCK_RESPONSE" == "missing" ]]; then
+            printf '%s\\n' '[]'
+            return 0
+          fi
+          if [[ "$1" == "api" && "$MOCK_RESPONSE" == "ready" ]]; then
+            if [[ "$*" == *"repos/Shaun-Z/power.notch/pulls/7"* ]]; then
+              printf '%s\\n' '{"head_ref":"dev","head_sha":"cccccccccccccccccccccccccccccccccccccccc","base_ref":"main","head_repo":"Shaun-Z/power.notch","base_repo":"Shaun-Z/power.notch","is_draft":false,"mergeable":true}'
+            else
+              printf '%s\\n' '[7]'
+            fi
+            return 0
+          fi
+          echo 'Unexpected gh call' >&2
+          return 1
+        }
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            output.touch()
+            result = subprocess.run(
+                ["bash", "-c", textwrap.dedent(mock) + textwrap.dedent(block)],
+                env={
+                    **os.environ,
+                    "MOCK_RESPONSE": response,
+                    "REPO": "Shaun-Z/power.notch",
+                    "VERSION": "0.1.0",
+                    "RUNNER_TEMP": directory,
+                    "GITHUB_OUTPUT": str(output),
+                },
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            return result, output.read_text()
+
+    def test_first_release_requires_a_dev_to_main_pr(self) -> None:
+        result, output = self.run_release_state("missing")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Expected exactly one open dev-to-main release PR, found 0", result.stdout)
+        self.assertEqual(output, "")
+
+    def test_fresh_release_builds_the_dev_to_main_pr_head(self) -> None:
+        result, output = self.run_release_state("ready")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(output, f"resume=false\nsource_sha={'c' * 40}\npr_number=7\n")
+
+    def test_draft_resume_keeps_the_original_build_source(self) -> None:
+        result, output = self.run_release_state("draft")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(output, f"resume=true\nsource_sha={'b' * 40}\npr_number=\n")
+
+    def test_release_lookup_failure_does_not_start_a_fresh_release(self) -> None:
+        result, output = self.run_release_state("unavailable")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Could not determine whether v0.1.0 already exists", result.stdout)
+        self.assertEqual(output, "")
+
     def test_nightly_uses_the_fixed_rolling_tag_and_asset(self) -> None:
         self.assertIn("TAG: nightly", self.nightly)
         self.assertIn("ASSET_NAME: powerNotch-nightly.dmg", self.nightly)
@@ -46,7 +121,7 @@ class WorkflowSmokeTests(unittest.TestCase):
         # TAG is pinned to `nightly` below, so this prefix always resolves to
         # .../releases/download/nightly/.
         self.assertIn(
-            "https://github.com/TheBoredTeam/powerNotch/releases/download/${TAG}/",
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/",
             self.nightly,
         )
         self.assertIn("TAG: nightly", self.nightly)

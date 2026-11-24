@@ -267,15 +267,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         NotificationCenter.default.addObserver(
-            forName: Notification.Name.automaticallySwitchDisplayChanged, object: nil, queue: nil
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.adjustWindowPosition(changeAlpha: true)
-                self?.setupDragDetectors()
-            }
-        }
-
-        NotificationCenter.default.addObserver(
             forName: Notification.Name.displayNotchVisibilityChanged, object: nil, queue: nil
         ) { [weak self] _ in
             Task { @MainActor in
@@ -532,7 +523,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension Notification.Name {
-    static let automaticallySwitchDisplayChanged = Notification.Name("automaticallySwitchDisplayChanged")
     static let expandedDragDetectionChanged = Notification.Name("expandedDragDetectionChanged")
 }
 

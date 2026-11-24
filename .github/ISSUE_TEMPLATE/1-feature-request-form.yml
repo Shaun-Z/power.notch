@@ -10,7 +10,7 @@ body:
       value: |
         ## Feature Request
         
-        Thanks for helping make **powerNotch** better! Please check [existing requests](https://github.com/TheBoredTeam/powerNotch/issues?q=is%3Aissue) before submitting to avoid duplicates.
+        Thanks for helping make **powerNotch** better! Please check [existing requests](https://github.com/Shaun-Z/power.notch/issues?q=is%3Aissue) before submitting to avoid duplicates.
 
   - type: textarea
     id: problem

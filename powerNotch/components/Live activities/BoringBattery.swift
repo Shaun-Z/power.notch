@@ -3,6 +3,7 @@ import Defaults
 
 /// A view that displays the battery status with an icon and charging indicator.
 struct BatteryView: View {
+    @Environment(\.notchGlassInk) private var ink
 
     var levelBattery: Float
     var isPluggedIn: Bool
@@ -35,7 +36,7 @@ struct BatteryView: View {
         } else if isCharging || isPluggedIn || levelBattery == 100 {
             return .green
         } else {
-            return .white
+            return ink.primary(0.95)
         }
     }
 
@@ -53,7 +54,7 @@ struct BatteryView: View {
                 .resizable()
                 .fontWeight(isForNotification ? .thin : .regular)
                 .aspectRatio(contentMode: .fit)
-                .foregroundStyle(.white.opacity(isForNotification ? 0.5 : 0.65))
+                .foregroundStyle(ink.secondary(isForNotification ? 0.5 : 0.65))
                 .frame(width: batteryWidth + 1)
 
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -66,7 +67,7 @@ struct BatteryView: View {
                 Image(iconStatus)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(ink.primary(1.0))
                     .frame(width: statusIconSize, height: statusIconSize)
             }
         }
@@ -140,7 +141,7 @@ struct BatteryMenuView: View {
             }
             .padding(.vertical, 8)
 
-            Divider().background(Color.white)
+            Divider()
 
             Button(action: openBatteryPreferences) {
                 Label("Battery Settings", systemImage: "gearshape")
@@ -152,7 +153,7 @@ struct BatteryMenuView: View {
         }
         .padding()
         .frame(width: 280)
-        .foregroundColor(.white)
+        .foregroundStyle(.primary)
     }
 
     private func openBatteryPreferences() {
@@ -165,6 +166,7 @@ struct BatteryMenuView: View {
 
 /// A view that displays the battery status and allows interaction to show detailed information.
 struct BoringBatteryView: View {
+    @Environment(\.notchGlassInk) private var ink
     
     @State var batteryWidth: CGFloat = 26
     var isCharging: Bool = false
@@ -197,7 +199,7 @@ struct BoringBatteryView: View {
                         if showBatteryPercentage {
                             Text("\(Int32(levelBattery))%")
                                 .font(.callout)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(ink.primary(1.0))
                         }
                         BatteryView(
                             levelBattery: levelBattery,
@@ -222,7 +224,7 @@ struct BoringBatteryView: View {
                                 .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                                 .monospacedDigit()
                                 .foregroundStyle(
-                                    Color.white.opacity(
+                                    ink.primary(
                                         showPopupMenu ? 1.0 : (isHoveringButton ? 0.96 : 0.88)
                                     )
                                 )

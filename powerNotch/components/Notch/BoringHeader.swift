@@ -26,6 +26,7 @@ struct NotchHeaderPressStyle: ButtonStyle {
 }
 
 private struct NotchHeaderGlassSurfaceModifier: ViewModifier {
+    @Environment(\.notchGlassInk) private var ink
     let isLiquidGlass: Bool
     let isActive: Bool
     let isHovering: Bool
@@ -36,7 +37,7 @@ private struct NotchHeaderGlassSurfaceModifier: ViewModifier {
         if isLiquidGlass {
             if #available(macOS 26.0, *) {
                 let tintOpacity: Double = isActive ? 0.24 : (isHovering ? 0.14 : 0.06)
-                let baseGlass = Glass.clear.tint(Color.white.opacity(tintOpacity))
+                let baseGlass = Glass.clear.tint(ink.surface(tintOpacity))
                 let glass = isInteractive ? baseGlass.interactive() : baseGlass
                 content
                     .glassEffect(glass, in: Capsule())
@@ -44,14 +45,14 @@ private struct NotchHeaderGlassSurfaceModifier: ViewModifier {
                 content
                     .background {
                         Capsule()
-                            .fill(Color.white.opacity(isActive ? 0.22 : (isHovering ? 0.14 : 0.09)))
+                            .fill(ink.surface(isActive ? 0.22 : (isHovering ? 0.14 : 0.09)))
                             .overlay {
                                 Capsule()
                                     .strokeBorder(
                                         LinearGradient(
                                             colors: [
-                                                Color.white.opacity(isActive ? 0.42 : (isHovering ? 0.30 : 0.20)),
-                                                Color.white.opacity(isActive ? 0.16 : 0.07)
+                                                ink.border(isActive ? 0.42 : (isHovering ? 0.30 : 0.20)),
+                                                ink.border(isActive ? 0.16 : 0.07)
                                             ],
                                             startPoint: .top,
                                             endPoint: .bottom
@@ -65,11 +66,11 @@ private struct NotchHeaderGlassSurfaceModifier: ViewModifier {
             content
                 .background {
                     Capsule()
-                        .fill(Color.white.opacity(isActive ? 0.20 : (isHovering ? 0.13 : 0.08)))
+                        .fill(ink.surface(isActive ? 0.20 : (isHovering ? 0.13 : 0.08)))
                         .overlay {
                             Capsule()
                                 .strokeBorder(
-                                    Color.white.opacity(isActive ? 0.24 : (isHovering ? 0.16 : 0.10)),
+                                    ink.border(isActive ? 0.24 : (isHovering ? 0.16 : 0.10)),
                                     lineWidth: 0.5
                                 )
                         }
@@ -117,6 +118,7 @@ struct NotchHeaderGlassGroup<Content: View>: View {
 }
 
 struct NotchHeaderIconButton: View {
+    @Environment(\.notchGlassInk) private var ink
     let systemName: String
     var isActive: Bool = false
     let isLiquidGlass: Bool
@@ -128,7 +130,7 @@ struct NotchHeaderIconButton: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: NotchHeaderMetrics.iconSize, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(isActive ? 1.0 : (isHovering ? 0.96 : 0.84)))
+                .foregroundStyle(ink.primary(isActive ? 1.0 : (isHovering ? 0.96 : 0.84)))
                 .frame(
                     width: NotchHeaderMetrics.controlHeight,
                     height: NotchHeaderMetrics.controlHeight

@@ -1333,11 +1333,7 @@ class MusicManager: ObservableObject {
         workItem?.cancel()
         withAnimation(.smooth) {
             self.albumArt = newAlbumArt
-            if Defaults[.coloredSpectrogram]
-                || Defaults[.liquidGlassNotch]
-                || Defaults[.playerColorTinting]
-                || Defaults[.enableAIUsageNotchTab]
-            {
+            if Defaults[.mediaColorStyle] == .albumArt {
                 self.calculateAverageColor()
             }
         }

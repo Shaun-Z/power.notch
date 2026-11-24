@@ -5,6 +5,7 @@
 //  Created by Richard Kunkli on 2024. 10. 17..
 //
 
+import AppKit
 import SwiftUI
 import Defaults
 
@@ -78,7 +79,11 @@ enum DisplayNotchSettings {
         if let explicit = overrides[uuid] {
             return explicit
         }
-        if overrides.isEmpty || Defaults[.automaticallySwitchDisplay] {
+        let hasAnyEnabledConnected = connectedScreens.contains { screen in
+            guard let screenUUID = screen.displayUUID else { return false }
+            return overrides[screenUUID] == true
+        }
+        if !hasAnyEnabledConnected {
             if let mainUUID = NSScreen.main?.displayUUID {
                 return uuid == mainUUID
             }
@@ -115,6 +120,63 @@ enum DisplayNotchSettings {
             }
         }
         updated[targetUUID] = enabled
+        Defaults[.displayNotchVisibility] = updated
+        NotificationCenter.default.post(name: .displayNotchVisibilityChanged, object: nil)
+    }
+
+    /// Returns whether Dynamic Island shape is enabled for the given display UUID,
+    /// falling back to the global `dynamicIslandShape` default when no per-display override exists.
+    static func usesDynamicIsland(
+        forUUID uuid: String?,
+        overrides: [String: Bool] = Defaults[.displayDynamicIslandShape],
+        defaultEnabled: Bool = Defaults[.dynamicIslandShape]
+    ) -> Bool {
+        guard let uuid, let explicit = overrides[uuid] else {
+            return defaultEnabled
+        }
+        return explicit
+    }
+
+    /// Sets Dynamic Island vs. Hanging Notch shape for a single display while preserving the
+    /// current effective mode of all other connected displays.
+    static func setUsesDynamicIsland(
+        _ enabled: Bool,
+        forUUID targetUUID: String,
+        connectedScreens: [NSScreen] = NSScreen.screens
+    ) {
+        var updated = Defaults[.displayDynamicIslandShape]
+        let fallback = Defaults[.dynamicIslandShape]
+        for screen in connectedScreens {
+            guard let uuid = screen.displayUUID else { continue }
+            if updated[uuid] == nil {
+                updated[uuid] = fallback
+            }
+        }
+        updated[targetUUID] = enabled
+        Defaults[.displayDynamicIslandShape] = updated
+    }
+
+    /// One-click action enabling all connected displays in Dynamic Island (`true`) or Hanging
+    /// Notch (`false`) mode, and updating the global default for newly connected displays.
+    static func setUsesDynamicIslandForAllDisplays(
+        _ enabled: Bool,
+        connectedScreens: [NSScreen] = NSScreen.screens
+    ) {
+        Defaults[.displayDynamicIslandShape] = [:]
+        Defaults[.dynamicIslandShape] = enabled
+        setAllDisplaysEnabled(true, connectedScreens: connectedScreens)
+    }
+
+    /// One-click action enabling or disabling the notch across all connected displays.
+    static func setAllDisplaysEnabled(
+        _ enabled: Bool,
+        connectedScreens: [NSScreen] = NSScreen.screens
+    ) {
+        var updated = Defaults[.displayNotchVisibility]
+        for screen in connectedScreens {
+            guard let uuid = screen.displayUUID else { continue }
+            updated[uuid] = enabled
+        }
         Defaults[.displayNotchVisibility] = updated
         NotificationCenter.default.post(name: .displayNotchVisibilityChanged, object: nil)
     }
@@ -197,16 +259,103 @@ enum OptionKeyAction: String, CaseIterable, Identifiable, Defaults.Serializable 
     var id: String { self.rawValue }
 }
 
+enum HapticFeedbackLevel: Int, CaseIterable, Identifiable, Defaults.Serializable {
+    case off = 0
+    case light = 1
+    case medium = 2
+    case strong = 3
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .off: return "Off"
+        case .light: return "Light"
+        case .medium: return "Medium"
+        case .strong: return "Strong"
+        }
+    }
+
+    var feedbackPattern: NSHapticFeedbackManager.FeedbackPattern? {
+        switch self {
+        case .off: return nil
+        case .light: return .levelChange
+        case .medium: return .alignment
+        case .strong: return .generic
+        }
+    }
+
+    func perform() {
+        guard let pattern = feedbackPattern else { return }
+        NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
+    }
+
+    static func performConfigured() {
+        Defaults[.hapticFeedbackLevel].perform()
+    }
+}
+
+enum LiquidGlassAppearanceMode: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case followSystem = "followSystem"
+    case light = "light"
+    case dark = "dark"
+    case custom = "custom"
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .followSystem: return "Follow system"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        case .custom: return "Custom"
+        }
+    }
+}
+
+enum MediaColorStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case systemDefault = "default"
+    case albumArt = "albumArt"
+    case custom = "custom"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .systemDefault: return "Default"
+        case .albumArt: return "Match album art"
+        case .custom: return "Custom"
+        }
+    }
+
+    static func resolvedCustomNSColor(from data: Data? = Defaults[.customMediaColorData]) -> NSColor {
+        if let data,
+           let nsColor = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSColor.self, from: data)
+        {
+            return nsColor
+        }
+        return NSColor.effectiveAccent
+    }
+
+    static func archiveCustomColor(_ color: Color) -> Data? {
+        let nsColor = NSColor(color).usingColorSpace(.sRGB) ?? NSColor(color)
+        return try? NSKeyedArchiver.archivedData(withRootObject: nsColor, requiringSecureCoding: true)
+    }
+}
+
 extension Defaults.Keys {
     // MARK: General
     static let menubarIcon = Key<Bool>("menubarIcon", default: true)
     static let displayNotchVisibility = Key<[String: Bool]>("displayNotchVisibility", default: [:])
-    static let automaticallySwitchDisplay = Key<Bool>("automaticallySwitchDisplay", default: true)
-    static let releaseName = Key<String>("releaseName", default: "Flying Rabbit 🐇🪽")
+    static let releaseName = Key<String>("releaseName", default: "Thunder⚡️")
     
     // MARK: Behavior
     static let minimumHoverDuration = Key<TimeInterval>("minimumHoverDuration", default: 0.3)
     static let enableHaptics = Key<Bool>("enableHaptics", default: true)
+    static let hapticFeedbackLevel = Key<HapticFeedbackLevel>(
+        "hapticFeedbackLevel",
+        default: (UserDefaults.standard.object(forKey: "enableHaptics") as? Bool) == false ? .off : .medium
+    )
     static let openNotchOnHover = Key<Bool>("openNotchOnHover", default: true)
     static let extendHoverArea = Key<Bool>("extendHoverArea", default: false)
     //static let openLastTabByDefault = Key<Bool>("openLastTabByDefault", default: false)
@@ -232,8 +381,24 @@ extension Defaults.Keys {
     static let enableShadow = Key<Bool>("enableShadow", default: true)
     static let cornerRadiusScaling = Key<Bool>("cornerRadiusScaling", default: true)
     static let liquidGlassNotch = Key<Bool>("liquidGlassNotch", default: true)
+    static let liquidGlassAppearanceMode = Key<LiquidGlassAppearanceMode>(
+        "liquidGlassAppearanceMode",
+        default: {
+            if let legacyStyle = UserDefaults.standard.string(forKey: "liquidGlassStyle"),
+               let migrated = LiquidGlassAppearanceMode(rawValue: legacyStyle)
+            {
+                return migrated
+            }
+            if (UserDefaults.standard.object(forKey: "developerClearLiquidGlass") as? Bool) == true {
+                return .light
+            }
+            return .dark
+        }()
+    )
     static let liquidGlassOpacity = Key<Double>("liquidGlassOpacity", default: 1.0)
+    static let customGlassColorData = Key<Data?>("customGlassColorData", default: nil)
     static let dynamicIslandShape = Key<Bool>("dynamicIslandShape", default: false)
+    static let displayDynamicIslandShape = Key<[String: Bool]>("displayDynamicIslandShape", default: [:])
 
     static let showNotHumanFace = Key<Bool>("showNotHumanFace", default: false)
     static let tileShowLabels = Key<Bool>("tileShowLabels", default: false)
@@ -243,6 +408,21 @@ extension Defaults.Keys {
         "sliderUseAlbumArtColor",
         default: SliderColorEnum.white
     )
+    static let mediaColorStyle = Key<MediaColorStyle>(
+        "mediaColorStyle",
+        default: {
+            if let sliderRaw = UserDefaults.standard.string(forKey: "sliderUseAlbumArtColor"),
+               sliderRaw == SliderColorEnum.albumArt.rawValue
+            {
+                return .albumArt
+            }
+            if (UserDefaults.standard.object(forKey: "coloredSpectrogram") as? Bool) == false {
+                return .systemDefault
+            }
+            return .albumArt
+        }()
+    )
+    static let customMediaColorData = Key<Data?>("customMediaColorData", default: nil)
     static let playerColorTinting = Key<Bool>("playerColorTinting", default: true)
     static let useMusicVisualizer = Key<Bool>("useMusicVisualizer", default: true)
     static let customVisualizers = Key<[CustomVisualizer]>("customVisualizers", default: [])

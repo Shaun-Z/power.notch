@@ -19,10 +19,10 @@ struct Config: Equatable {
 }
 
 struct WheelPicker: View {
+    @Environment(\.notchGlassInk) private var ink
     @EnvironmentObject var vm: BoringViewModel
     @Binding var selectedDate: Date
     @State private var scrollPosition: Int?
-    @State private var haptics: Bool = false
     @State private var byClick: Bool = false
     let config: Config
 
@@ -47,9 +47,7 @@ struct WheelPicker: View {
                             withAnimation {
                                 scrollPosition = index
                             }
-                            if Defaults[.enableHaptics] {
-                                haptics.toggle()
-                            }
+                            HapticFeedbackLevel.performConfigured()
                         }
                     }
                 }
@@ -61,7 +59,6 @@ struct WheelPicker: View {
         .scrollPosition(id: $scrollPosition, anchor: .center)
         .scrollTargetBehavior(.viewAligned)  // Ensures scroll view snaps the centered view
         .safeAreaPadding(.horizontal)
-        .sensoryFeedback(.alignment, trigger: haptics)
         .onChange(of: scrollPosition) { oldValue, newValue in
             if !byClick {
                 handleScrollChange(newValue: newValue, config: config)
@@ -90,7 +87,7 @@ struct WheelPicker: View {
         let isToday = Calendar.current.isDateInToday(date)
         return Button(action: onClick) {
             VStack(spacing: 8) {
-                dayText(date: dateToString(for: date), isToday: isToday, isSelected: isSelected)
+                dayText(date: dateToString(for: date), isSelected: isSelected)
                 dateCircle(date: date, isToday: isToday, isSelected: isSelected)
             }
             .padding(.vertical, 4)
@@ -102,10 +99,10 @@ struct WheelPicker: View {
         .id(id)
     }
 
-    private func dayText(date: String, isToday: Bool, isSelected: Bool) -> some View {
+    private func dayText(date: String, isSelected: Bool) -> some View {
         Text(date)
             .font(.caption)
-            .foregroundColor(isSelected ? .white : Color(white: 0.65))
+            .foregroundColor(isSelected ? ink.primary(1.0) : ink.secondary(0.65))
     }
 
     private func dateCircle(date: Date, isToday: Bool, isSelected: Bool) -> some View {
@@ -120,7 +117,9 @@ struct WheelPicker: View {
             Text("\(date.date)")
                 .font(.body)
                 .fontWeight(.medium)
-                .foregroundColor(isSelected ? .white : Color(white: isToday ? 0.9 : 0.65))
+                .foregroundColor(
+                    isToday ? .white : (isSelected ? ink.primary(1.0) : ink.secondary(0.65))
+                )
         }
     }
 
@@ -132,9 +131,7 @@ struct WheelPicker: View {
         let date = dateForItemIndex(index: newIndex, spacerNum: spacerNum)
         if !Calendar.current.isDate(date, inSameDayAs: selectedDate) {
             selectedDate = date
-            if Defaults[.enableHaptics] {
-                haptics.toggle()
-            }
+            HapticFeedbackLevel.performConfigured()
         }
     }
 
@@ -179,6 +176,7 @@ struct WheelPicker: View {
 }
 
 struct CalendarView: View {
+    @Environment(\.notchGlassInk) private var ink
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject private var calendarManager = CalendarManager.shared
     @State private var selectedDate = Date()
@@ -190,11 +188,11 @@ struct CalendarView: View {
                     Text(selectedDate.formatted(.dateTime.month(.abbreviated)))
                         .font(.title3)
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                        .foregroundColor(ink.primary(1.0))
                     Text(selectedDate.formatted(.dateTime.year()))
                         .font(.title3)
                         .fontWeight(.light)
-                        .foregroundColor(Color(white: 0.65))
+                        .foregroundColor(ink.secondary(0.65))
                 }
 
                 WheelPicker(selectedDate: $selectedDate, config: Config())
@@ -247,24 +245,26 @@ struct CalendarView: View {
 }
 
 struct EmptyEventsView: View {
+    @Environment(\.notchGlassInk) private var ink
     let selectedDate: Date
     
     var body: some View {
         VStack {
             Image(systemName: "calendar.badge.checkmark")
                 .font(.title)
-                .foregroundColor(Color(white: 0.65))
+                .foregroundColor(ink.secondary(0.65))
             Text(Calendar.current.isDateInToday(selectedDate) ? "No events today" : "No events")
                 .font(.subheadline)
-                .foregroundColor(.white)
+                .foregroundColor(ink.primary(1.0))
             Text("Enjoy your free time!")
                 .font(.caption)
-                .foregroundColor(Color(white: 0.65))
+                .foregroundColor(ink.secondary(0.65))
         }
     }
 }
 
 struct EventListView: View {
+    @Environment(\.notchGlassInk) private var ink
     @Environment(\.openURL) private var openURL
     @ObservedObject private var calendarManager = CalendarManager.shared
     let events: [EventModel]
@@ -369,7 +369,7 @@ struct EventListView: View {
                     HStack {
                         Text(event.title)
                             .font(.callout)
-                            .foregroundColor(.white)
+                            .foregroundColor(ink.primary(1.0))
                             .lineLimit(showFullEventTitles ? nil : 1)
                         Spacer(minLength: 0)
                         VStack(alignment: .trailing, spacing: 4) {
@@ -377,11 +377,11 @@ struct EventListView: View {
                                 Text("All-day")
                                     .font(.caption)
                                     .fontWeight(.medium)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(ink.primary(1.0))
                                     .lineLimit(1)
                             } else {
                                 Text(event.start, style: .time)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(ink.primary(1.0))
                                     .font(.caption)
                             }
                         }
@@ -407,13 +407,13 @@ struct EventListView: View {
                         Text(event.title)
                             .font(.callout)
                             .fontWeight(.medium)
-                            .foregroundColor(.white)
+                            .foregroundColor(ink.primary(1.0))
                             .lineLimit(showFullEventTitles ? nil : 2)
 
                         if let location = event.location, !location.isEmpty {
                             Text(location)
                                 .font(.caption)
-                                .foregroundColor(Color(white: 0.65))
+                                .foregroundColor(ink.secondary(0.65))
                                 .lineLimit(1)
                         }
                     }
@@ -423,13 +423,13 @@ struct EventListView: View {
                             Text("All-day")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundColor(.white)
+                                .foregroundColor(ink.primary(1.0))
                                 .lineLimit(1)
                         } else {
                             Text(event.start, style: .time)
-                                .foregroundColor(.white)
+                                .foregroundColor(ink.primary(1.0))
                             Text(event.end, style: .time)
-                                .foregroundColor(Color(white: 0.65))
+                                .foregroundColor(ink.secondary(0.65))
                         }
                     }
                     .font(.caption)

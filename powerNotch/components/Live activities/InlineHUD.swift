@@ -9,6 +9,7 @@ import SwiftUI
 import Defaults
 
 struct InlineHUD: View {
+    @Environment(\.notchGlassInk) private var ink
     @EnvironmentObject var vm: BoringViewModel
     @Binding var type: SneakContentType
     @Binding var value: CGFloat
@@ -58,12 +59,13 @@ struct InlineHUD: View {
                             EmptyView()
                     }
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(ink.primary(1.0))
                 .symbolVariant(.fill)
                 
                 Text(Type2Name(type))
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundStyle(ink.primary(1.0))
                     .lineLimit(1)
                     .allowsTightening(true)
                     .contentTransition(.numericText())
@@ -77,7 +79,7 @@ struct InlineHUD: View {
             HStack {
                 if (type == .mic) {
                     Text(value.isZero ? "muted" : "unmuted")
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(ink.secondary(0.65))
                         .lineLimit(1)
                         .allowsTightening(true)
                         .multilineTextAlignment(.trailing)
@@ -96,7 +98,7 @@ struct InlineHUD: View {
                             Text("muted")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundStyle(.gray)
+                                .foregroundStyle(ink.secondary(0.65))
                                 .lineLimit(1)
                                 .allowsTightening(true)
                                 .multilineTextAlignment(.trailing)
@@ -104,7 +106,7 @@ struct InlineHUD: View {
                             Text("\(Int(value * 100))%")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundStyle(.gray)
+                                .foregroundStyle(ink.secondary(0.65))
                                 .lineLimit(1)
                                 .allowsTightening(true)
                                 .multilineTextAlignment(.trailing)

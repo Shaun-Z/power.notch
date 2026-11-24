@@ -29,6 +29,8 @@ final class AIUsageManager: ObservableObject {
     @Published var isCopilotDeviceFlowRunning: Bool = false
     private var copilotDeviceFlowTask: Task<Void, Never>?
 
+    private let refreshCoordinator = AIUsageRefreshCoordinator<AIProviderID, AIProviderSnapshot>()
+    private var historyRequestID = UUID()
     private var refreshTimerTask: Task<Void, Never>?
     private var historyCollectionTask: Task<Void, Never>?
     private var cachedDailyHistories: [AIProviderID: [AIUsageWidgetDailyPoint]] = [:]
@@ -51,6 +53,10 @@ final class AIUsageManager: ObservableObject {
     }
 
     private init() {
+        refreshCoordinator.onChange = { [weak self] providers in
+            self?.refreshingProviders = providers
+            self?.isRefreshing = !providers.isEmpty
+        }
         loadProviderConfigs()
         loadCachedSnapshots()
         observeSettingsChanges()
@@ -72,25 +78,68 @@ final class AIUsageManager: ObservableObject {
         return AIProviderID.allCases.filter { rawList.contains($0.rawValue) }
     }
 
-    static func pinnedRingKey(provider: AIProviderID, groupID: String) -> String {
+    enum ResolvedClosedNotchItem {
+        case ring(provider: AIProviderID, group: AIUsageRingGroup)
+        case balance(provider: AIProviderID, balance: AIUsageBalance, currencyBalance: AIUsageCurrencyBalance)
+
+        var provider: AIProviderID {
+            switch self {
+            case .ring(let provider, _), .balance(let provider, _, _):
+                return provider
+            }
+        }
+
+        var pinnedKey: String {
+            switch self {
+            case .ring(let provider, let group):
+                return AIUsageManager.pinnedRingKey(provider: provider, groupID: group.id)
+            case .balance(let provider, _, let currencyBalance):
+                return AIUsageManager.pinnedBalanceKey(provider: provider, currency: currencyBalance.currency)
+            }
+        }
+    }
+
+    nonisolated private static let balanceKeyMarker = "__balance__"
+
+    nonisolated static func pinnedRingKey(provider: AIProviderID, groupID: String) -> String {
         "\(provider.rawValue)|\(groupID)"
     }
 
-    func resolvedPinnedRing(pinnedID: String) -> (provider: AIProviderID, group: AIUsageRingGroup)? {
+    nonisolated static func pinnedBalanceKey(provider: AIProviderID, currency: String? = nil) -> String {
+        if let currency, !currency.isEmpty {
+            return "\(provider.rawValue)|\(balanceKeyMarker)|\(currency.uppercased())"
+        }
+        return "\(provider.rawValue)|\(balanceKeyMarker)"
+    }
+
+    func resolvedPinnedItem(pinnedID: String) -> ResolvedClosedNotchItem? {
         if !pinnedID.isEmpty {
-            let parts = pinnedID.split(separator: "|", maxSplits: 1)
-            if parts.count == 2,
+            let parts = pinnedID.split(separator: "|", omittingEmptySubsequences: false)
+            if parts.count >= 2,
                let provider = AIProviderID(rawValue: String(parts[0])),
                enabledProviders.contains(provider),
-               let windows = snapshots[provider]?.windows, !windows.isEmpty
+               let snapshot = snapshots[provider]
             {
-                let groupID = String(parts[1])
-                let groups = AIUsageRingGroup.build(from: windows)
-                if let matched = groups.first(where: { $0.id == groupID }) {
-                    return (provider, matched)
-                }
-                if let first = groups.first {
-                    return (provider, first)
+                if parts[1] == Self.balanceKeyMarker {
+                    if let balance = snapshot.balance {
+                        let currencies = balance.allCurrencyBalances
+                        if !currencies.isEmpty {
+                            let requestedCurrency = parts.count >= 3 ? String(parts[2]).uppercased() : nil
+                            let matched = requestedCurrency.flatMap { req in
+                                currencies.first(where: { $0.currency.uppercased() == req })
+                            } ?? currencies[0]
+                            return .balance(provider: provider, balance: balance, currencyBalance: matched)
+                        }
+                    }
+                } else if !snapshot.windows.isEmpty {
+                    let groupID = parts.dropFirst().joined(separator: "|")
+                    let groups = AIUsageRingGroup.build(from: snapshot.windows)
+                    if let matched = groups.first(where: { $0.id == groupID }) {
+                        return .ring(provider: provider, group: matched)
+                    }
+                    if let first = groups.first {
+                        return .ring(provider: provider, group: first)
+                    }
                 }
             }
         }
@@ -99,9 +148,18 @@ final class AIUsageManager: ObservableObject {
             if let windows = snapshots[provider]?.windows, !windows.isEmpty,
                let first = AIUsageRingGroup.build(from: windows).first
             {
-                return (provider, first)
+                return .ring(provider: provider, group: first)
             }
         }
+
+        for provider in enabledProviders {
+            if let balance = snapshots[provider]?.balance,
+               let firstCurrency = balance.allCurrencyBalances.first
+            {
+                return .balance(provider: provider, balance: balance, currencyBalance: firstCurrency)
+            }
+        }
+
         return nil
     }
 
@@ -116,6 +174,7 @@ final class AIUsageManager: ObservableObject {
                 current.append(provider.rawValue)
             }
         } else {
+            refreshCoordinator.cancel(for: provider)
             current.removeAll { $0 == provider.rawValue }
         }
         Defaults[.aiUsageEnabledProviders] = current
@@ -132,6 +191,7 @@ final class AIUsageManager: ObservableObject {
     }
 
     func updateConfig(_ config: AIProviderConfig) {
+        refreshCoordinator.cancel(for: config.provider)
         providerConfigs[config.provider] = config
         saveProviderConfigs()
     }
@@ -196,8 +256,9 @@ final class AIUsageManager: ObservableObject {
         let homePath = Self.realUserHomePath
 
         historyCollectionTask?.cancel()
+        let requestID = UUID()
+        historyRequestID = requestID
         historyCollectionTask = Task.detached(priority: .utility) { [weak self] in
-            AIUsageHistoryCollector.recordLedgerObservation(snapshots: snapshotsCopy)
             let histories = AIUsageHistoryCollector.collect30DayHistories(
                 for: activeProviders,
                 snapshots: snapshotsCopy,
@@ -205,7 +266,7 @@ final class AIUsageManager: ObservableObject {
             )
             guard !Task.isCancelled else { return }
             await MainActor.run { [weak self] in
-                guard let self else { return }
+                guard let self, self.historyRequestID == requestID else { return }
                 self.cachedDailyHistories = histories
                 self.lastHistoryCollectionAt = Date()
                 self.syncWidgetSnapshot()
@@ -325,54 +386,34 @@ final class AIUsageManager: ObservableObject {
 
     func refreshAllEnabled(userInitiated: Bool = false) async {
         let activeProviders = enabledProviders
-        guard !activeProviders.isEmpty else { return }
-        isRefreshing = true
-        defer {
-            isRefreshing = false
-            lastGlobalRefresh = Date()
-            saveCachedSnapshots()
-        }
-
-        await withTaskGroup(of: (AIProviderID, AIProviderSnapshot).self) { group in
+        await withTaskGroup(of: Void.self) { group in
             for provider in activeProviders {
-                refreshingProviders.insert(provider)
-                let cfg = config(for: provider)
-                let allowKeychain = userInitiated && Defaults[.aiUsageAllowExternalKeychain]
                 group.addTask {
-                    let snap = await Self.fetchProviderSnapshot(
-                        provider: provider,
-                        config: cfg,
-                        allowExternalKeychain: allowKeychain
-                    )
-                    return (provider, snap)
+                    await self.refresh(provider: provider, userInitiated: userInitiated)
                 }
-            }
-
-            for await (provider, snapshot) in group {
-                refreshingProviders.remove(provider)
-                applySnapshot(snapshot, for: provider)
             }
         }
     }
 
     func refresh(provider: AIProviderID, userInitiated: Bool = true) async {
-        refreshingProviders.insert(provider)
-        isRefreshing = true
-        defer {
-            refreshingProviders.remove(provider)
-            isRefreshing = !refreshingProviders.isEmpty
-            lastGlobalRefresh = Date()
-            saveCachedSnapshots()
-        }
-
+        guard isProviderEnabled(provider) else { return }
         let cfg = config(for: provider)
         let allowKeychain = userInitiated && Defaults[.aiUsageAllowExternalKeychain]
-        let snapshot = await Self.fetchProviderSnapshot(
-            provider: provider,
-            config: cfg,
-            allowExternalKeychain: allowKeychain
-        )
+        guard let snapshot = await refreshCoordinator.refresh(for: provider, operation: {
+            await Self.fetchProviderSnapshot(
+                provider: provider,
+                config: cfg,
+                allowExternalKeychain: allowKeychain
+            )
+        }) else { return }
         applySnapshot(snapshot, for: provider)
+        // Only fresh, accepted responses may advance the balance baseline. Cached snapshots
+        // and history-only refreshes must not replay older balances into the ledger.
+        if snapshot.errorMessage == nil {
+            AIUsageHistoryCollector.recordLedgerObservation(snapshots: [provider: snapshot])
+        }
+        lastGlobalRefresh = Date()
+        saveCachedSnapshots()
     }
 
     private func applySnapshot(_ newSnapshot: AIProviderSnapshot, for provider: AIProviderID) {

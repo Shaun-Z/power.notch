@@ -48,24 +48,6 @@ enum AIUsageChartMetric: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-struct AIUsageWidgetDailyPoint: Codable, Identifiable, Sendable, Equatable {
-    let dayKey: String      // "YYYY-MM-DD" in local timezone
-    let tokens: Int64
-    let cost: Double
-    let requests: Int
-
-    var id: String { dayKey }
-
-    var shortDateLabel: String {
-        // "YYYY-MM-DD" -> "MM/DD"
-        let parts = dayKey.split(separator: "-")
-        if parts.count == 3, let m = Int(parts[1]), let d = Int(parts[2]) {
-            return "\(m)/\(d)"
-        }
-        return dayKey
-    }
-}
-
 struct AIUsageWidgetPayload: Codable, Sendable {
     let schemaVersion: Int
     let updatedAt: Date

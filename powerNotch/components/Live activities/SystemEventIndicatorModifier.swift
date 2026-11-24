@@ -9,6 +9,7 @@ import SwiftUI
 import Defaults
 
 struct SystemEventIndicatorModifier: View {
+    @Environment(\.notchGlassInk) private var ink
     @EnvironmentObject var vm: BoringViewModel
     @Binding var eventType: SneakContentType
     @Binding var value: CGFloat {
@@ -32,29 +33,31 @@ struct SystemEventIndicatorModifier: View {
                             .contentTransition(.interpolate)
                             .symbolVariant(value > 0 ? .none : .slash)
                             .frame(width: 20, height: 15, alignment: .leading)
+                            .foregroundStyle(ink.primary(1.0))
                     } else {
                         Image(systemName: icon)
                             .contentTransition(.interpolate)
                             .opacity(value.isZero ? 0.6 : 1)
                             .scaleEffect(value.isZero ? 0.85 : 1)
                             .frame(width: 20, height: 15, alignment: .leading)
+                            .foregroundStyle(ink.primary(1.0))
                     }
                 case .brightness:
                     Image(systemName: "sun.max.fill")
                         .contentTransition(.symbolEffect)
                         .frame(width: 20, height: 15)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(ink.primary(1.0))
                 case .backlight:
                     Image(systemName: value > 0.5 ? "light.max" : "light.min")
                         .contentTransition(.interpolate)
                         .frame(width: 20, height: 15)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(ink.primary(1.0))
                 case .mic:
                     Image(systemName: "mic")
                         .symbolVariant(value > 0 ? .none : .slash)
                         .contentTransition(.interpolate)
                         .frame(width: 20, height: 15)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(ink.primary(1.0))
                 default:
                     EmptyView()
             }
@@ -63,13 +66,13 @@ struct SystemEventIndicatorModifier: View {
                 if Defaults[.showClosedNotchHUDPercentage] {
                     Text("\(Int(value * 100))%")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(ink.primary(1.0))
                         .monospacedDigit()
                         .frame(width: 35, alignment: .trailing)
                 }
             } else {
                 Text("Mic \(value > 0 ? "unmuted" : "muted")")
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(ink.secondary(0.65))
                     .lineLimit(1)
                     .allowsTightening(true)
             }
@@ -96,6 +99,7 @@ struct SystemEventIndicatorModifier: View {
 }
 
 struct DraggableProgressBar: View {
+    @Environment(\.notchGlassInk) private var ink
     @EnvironmentObject var vm: BoringViewModel
     @Binding var value: CGFloat
     var onChange: ((CGFloat) -> Void)? = nil
@@ -108,24 +112,24 @@ struct DraggableProgressBar: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(.tertiary)
+                        .fill(ink.isClearGlass ? AnyShapeStyle(ink.track(0.20)) : AnyShapeStyle(.tertiary))
                     Capsule()
                         .fill(
                             Defaults[.enableGradient] ?
                                 AnyShapeStyle(LinearGradient(
                                     colors: Defaults[.systemEventIndicatorUseAccent] ?
                                         [Color.effectiveAccent, Color.effectiveAccent.ensureMinimumBrightness(factor: 0.2)] :
-                                        [Color.white, Color.white.opacity(0.2)],
+                                        [ink.primary(1.0), ink.base.opacity(0.25)],
                                     startPoint: .trailing,
                                     endPoint: .leading
                                 )) :
-                                AnyShapeStyle(Defaults[.systemEventIndicatorUseAccent] ? Color.effectiveAccent : Color.white)
+                                AnyShapeStyle(Defaults[.systemEventIndicatorUseAccent] ? Color.effectiveAccent : ink.primary(1.0))
                         )
                         .frame(width: max(0, min(geo.size.width * value, geo.size.width)))
                         .shadow(color: Defaults[.systemEventIndicatorShadow] ?
                             (Defaults[.systemEventIndicatorUseAccent] ?
                                 Color.effectiveAccent.ensureMinimumBrightness(factor: 0.7) :
-                                Color.white) :
+                                (ink.isClearGlass ? Color.clear : Color.white)) :
                             Color.clear,
                             radius: 8, x: 3)
                         .opacity(value.isZero ? 0 : 1)

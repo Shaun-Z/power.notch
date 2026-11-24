@@ -155,6 +155,10 @@
 		B1F747F92EC7E94000F841DB /* LottieView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F747F82EC7E94000F841DB /* LottieView.swift */; };
 		B1FEB4992C7686630066EBBC /* PanGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1FEB4982C7686630066EBBC /* PanGesture.swift */; };
 		F38DE6482D8243E7008B5C6D /* BatteryActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */; };
+		A17000000000000000000011 /* AIUsageHistoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000001 /* AIUsageHistoryModels.swift */; };
+		A17000000000000000000012 /* CodexUsageLogParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000002 /* CodexUsageLogParser.swift */; };
+		A17000000000000000000013 /* AIUsageRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000003 /* AIUsageRefreshCoordinator.swift */; };
+		A17000000000000000000014 /* AIUsageHistoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000001 /* AIUsageHistoryModels.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -352,6 +356,9 @@
 		B1F747F82EC7E94000F841DB /* LottieView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieView.swift; sourceTree = "<group>"; };
 		B1FEB4982C7686630066EBBC /* PanGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanGesture.swift; sourceTree = "<group>"; };
 		F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryActivityManager.swift; sourceTree = "<group>"; };
+		A17000000000000000000001 /* AIUsageHistoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageHistoryModels.swift; sourceTree = "<group>"; };
+		A17000000000000000000002 /* CodexUsageLogParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageLogParser.swift; sourceTree = "<group>"; };
+		A17000000000000000000003 /* AIUsageRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageRefreshCoordinator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -604,6 +611,7 @@
 		14CEF4092C5CAED200855D72 = {
 			isa = PBXGroup;
 			children = (
+				A17000000000000000000020 /* AIUsageCore */,
 				9B9763FE30B2E94000CCA45B /* PowerNotchWidgetsExtension.entitlements */,
 				112B0EB62E30DD0F00562D6C /* mediaremote-adapter */,
 				14CEF4142C5CAED300855D72 /* powerNotch */,
@@ -831,6 +839,16 @@
 			path = Tips;
 			sourceTree = "<group>";
 		};
+		A17000000000000000000020 /* AIUsageCore */ = {
+			isa = PBXGroup;
+			children = (
+				A17000000000000000000001 /* AIUsageHistoryModels.swift */,
+				A17000000000000000000002 /* CodexUsageLogParser.swift */,
+				A17000000000000000000003 /* AIUsageRefreshCoordinator.swift */,
+			);
+			path = AIUsageCore;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -1014,6 +1032,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A17000000000000000000011 /* AIUsageHistoryModels.swift in Sources */,
+				A17000000000000000000012 /* CodexUsageLogParser.swift in Sources */,
+				A17000000000000000000013 /* AIUsageRefreshCoordinator.swift in Sources */,
 				115C12EC2ED3D003009754CA /* OpenNotchHUD.swift in Sources */,
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,
 				9B9763D330B0373500CCA45B /* AIUsageModels.swift in Sources */,
@@ -1145,6 +1166,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A17000000000000000000014 /* AIUsageHistoryModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1178,7 +1200,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = PowerNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.3;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1202,7 +1224,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = PowerNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.3;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1376,7 +1398,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.3;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app;
 				PRODUCT_NAME = powerNotch;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1430,7 +1452,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.3;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app;
 				PRODUCT_NAME = powerNotch;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1472,7 +1494,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.3;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1516,7 +1538,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.7.3;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

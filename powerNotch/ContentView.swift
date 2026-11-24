@@ -28,8 +28,13 @@ struct ContentView: View {
     @State private var anyDropDebounceTask: Task<Void, Never>?
 
     @State private var gestureProgress: CGFloat = .zero
-
-    @State private var haptics: Bool = false
+    @State private var closedAIUsageRightWingWidth: CGFloat = 0
+    @State private var isAIUsageFlightTransitioning: Bool = false
+    @State private var settledAIUsageFlightOpen: Bool = false
+    @State private var settledAIUsageOpenTab: NotchViews = .home
+    @State private var aiUsageFlightResetTask: Task<Void, Never>?
+    @State private var aiUsageFlightHasClosedAnchor: Bool = false
+    @State private var aiUsageFlightHasOpenAnchor: Bool = false
 
     @Namespace var albumArtNamespace
 
@@ -39,9 +44,17 @@ struct ContentView: View {
 
     @Default(.liquidGlassNotch) var liquidGlassNotch
 
+    @Default(.developerClearLiquidGlass) var clearLiquidGlass
+
     @Default(.dynamicIslandShape) var dynamicIslandShape
 
+    @Default(.displayDynamicIslandShape) var displayDynamicIslandShape
+
     @Default(.enableLyrics) var enableLyrics
+
+    @Default(.mediaColorStyle) var mediaColorStyle
+
+    @Default(.customMediaColorData) var customMediaColorData
 
     @Default(.enableAIUsageNotchTab) var enableAIUsageNotchTab
 
@@ -52,6 +65,7 @@ struct ContentView: View {
 
     private let extendedHoverPadding: CGFloat = 30
     private let zeroHeightHoverPadding: CGFloat = 10
+    private let closedLiveActivitySpacing: CGFloat = 8
 
     private var isLiquidGlassOpen: Bool {
         vm.notchState == .open && liquidGlassNotch
@@ -96,31 +110,19 @@ struct ContentView: View {
         return false
     }
 
-    private var isClosedVerticallyExpanded: Bool {
-        guard vm.notchState == .closed else { return false }
-        if coordinator.helloAnimationRunning { return true }
-        if coordinator.sneakPeek.show
-            && (coordinator.sneakPeek.type != .music)
-            && (coordinator.sneakPeek.type != .battery)
-            && !Defaults[.inlineHUD]
-        {
-            return true
-        }
-        if coordinator.sneakPeek.show
-            && coordinator.sneakPeek.type == .music
-            && !vm.hideOnClosed
-            && Defaults[.sneakPeekStyles] == .standard
-        {
-            return true
-        }
-        return false
+    private var usesDynamicIsland: Bool {
+        DisplayNotchSettings.usesDynamicIsland(
+            forUUID: vm.screenUUID,
+            overrides: displayDynamicIslandShape,
+            defaultEnabled: dynamicIslandShape
+        )
     }
 
     private var isDynamicIslandActive: Bool {
-        guard dynamicIslandShape else { return false }
+        guard usesDynamicIsland else { return false }
         if vm.notchState == .open { return true }
         if isClosedExpanded { return true }
-        return !hasPhysicalNotch && vm.effectiveClosedNotchHeight > 0
+        return vm.effectiveClosedNotchHeight > 0
     }
 
     private var isFloatingDynamicIsland: Bool {
@@ -174,10 +176,12 @@ struct ContentView: View {
             if vm.notchState == .open {
                 return openConcentricOuterRadius
             }
-            if isClosedVerticallyExpanded {
+            if coordinator.helloAnimationRunning {
                 return 22
             }
-            // Exact semicircular capsule radius matching full closed pill height (R_outer = H_pill / 2)
+            // Exact concentric outer radius matching the top closed row's circular wings
+            // (R_outer = r_inner + d = side/2 + (H_closed - side)/2 = H_closed/2), preserved
+            // even when HUD/sneak-peek expands downward so top-left/top-right corners never pinch.
             return max(0, closedVisualHeight / 2)
         }
         guard vm.notchState == .open && Defaults[.cornerRadiusScaling] else {
@@ -188,13 +192,14 @@ struct ContentView: View {
 
     private var defaultClosedVisualHeight: CGFloat {
         guard vm.effectiveClosedNotchHeight > 0 else { return 0 }
+        let physicalHeight = vm.physicalNotchSize?.height ?? 0
         if let screen = vm.screenUUID.flatMap({ NSScreen.screen(withUUID: $0) }) ?? NSScreen.main {
             let hmb = DisplayNotchSettings.menuBarHeight(for: screen)
             if hmb > 0 {
-                return max(14, hmb - DisplayNotchSettings.menuBarDefaultHeightTrim)
+                return max(14, physicalHeight, hmb - DisplayNotchSettings.menuBarDefaultHeightTrim)
             }
         }
-        return max(14, vm.effectiveClosedNotchHeight - DisplayNotchSettings.menuBarDefaultHeightTrim)
+        return max(14, physicalHeight, vm.effectiveClosedNotchHeight - DisplayNotchSettings.menuBarDefaultHeightTrim)
     }
 
     private var closedVisualHeight: CGFloat {
@@ -217,12 +222,44 @@ struct ContentView: View {
         return max(8, baseHeight - verticalMargin)
     }
 
+    private var closedSideClearance: CGFloat {
+        max(2, (closedVisualHeight - closedLiveActivitySide) / 2)
+    }
+
+    private var closedIdlePillRadius: CGFloat {
+        coordinator.helloAnimationRunning ? 22 : max(0, closedVisualHeight / 2)
+    }
+
+    /// Inner spacer width for the collapsed idle state. On displays with a physical camera notch:
+    /// - In Dynamic Island mode, wraps the hardware notch in the minimum achievable capsule width
+    ///   (`physicalWidth + 2 * R`) so the capsule's straight top edge covers the physical notch's
+    ///   widest top flare and both semicircular end caps clear the hardware bezel completely.
+    /// - In Hanging Notch mode, sizes the vertical side walls (`innerWidth + 2 * closedSideClearance`)
+    ///   to wrap cleanly outside the physical hardware bezel so the exterior glass rim is never clipped.
+    private var closedIdleInnerWidth: CGFloat {
+        if let physicalWidth = vm.physicalNotchSize?.width, physicalWidth > 0 {
+            if isDynamicIslandActive {
+                let minPillWidth = physicalWidth + closedIdlePillRadius * 2
+                return max(0, minPillWidth - 2 * closedSideClearance)
+            }
+            let targetWallWidth = max(vm.closedNotchSize.width, physicalWidth + 4)
+            return max(0, targetWallWidth - 2 * closedSideClearance)
+        }
+        return max(0, vm.closedNotchSize.width - 20)
+    }
+
     private var bottomCornerRadius: CGFloat {
         if isDynamicIslandActive {
             return topCornerRadius
         }
         if vm.notchState == .open {
             return openConcentricOuterRadius
+        }
+        if let physicalHeight = vm.physicalNotchSize?.height,
+           physicalHeight > 0,
+           !isClosedExpanded
+        {
+            return min(cornerRadiusInsets.closed.bottom, max(8, physicalHeight * 0.3125))
         }
         return cornerRadiusInsets.closed.bottom
     }
@@ -231,9 +268,21 @@ struct ContentView: View {
     /// top meniscus ears so the inner 640pt card body and all child elements sit at identical
     /// screen coordinates in both Dynamic Island and Non-Dynamic Island modes.
     private var openOuterEarWidth: CGFloat {
-        guard !dynamicIslandShape else { return 0 }
+        guard !usesDynamicIsland else { return 0 }
         guard Defaults[.cornerRadiusScaling] else { return cornerRadiusInsets.closed.top }
         return liquidGlassNotch ? openNotchEarMaxInset : cornerRadiusInsets.opened.top
+    }
+
+    private var closedAIUsageEffectiveRightWidth: CGFloat {
+        let side = closedLiveActivitySide
+        guard enableAIUsageNotchTab else { return side }
+        return max(side, closedAIUsageRightWingWidth)
+    }
+
+    private var closedAIUsageBalancedLeftWidth: CGFloat {
+        let side = closedLiveActivitySide
+        guard hasPhysicalNotch && enableAIUsageNotchTab else { return side }
+        return max(side, closedAIUsageRightWingWidth)
     }
 
     private var computedChinWidth: CGFloat {
@@ -247,16 +296,22 @@ struct ContentView: View {
             && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle)
             && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
         {
-            chinWidth += (2 * closedLiveActivitySide + 20)
+            chinWidth += (closedAIUsageBalancedLeftWidth + closedAIUsageEffectiveRightWidth + 20)
         } else if !coordinator.expandingView.show && vm.notchState == .closed
             && enableAIUsageNotchTab && !vm.hideOnClosed
         {
-            chinWidth += (2 * closedLiveActivitySide + 20)
+            chinWidth += (closedAIUsageBalancedLeftWidth + closedAIUsageEffectiveRightWidth + 20)
         } else if !coordinator.expandingView.show && vm.notchState == .closed
             && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace]
             && !vm.hideOnClosed
         {
             chinWidth += (2 * closedLiveActivitySide + 20)
+        } else if vm.notchState == .closed,
+            isDynamicIslandActive,
+            let physicalWidth = vm.physicalNotchSize?.width,
+            physicalWidth > 0
+        {
+            chinWidth = max(chinWidth, physicalWidth + closedIdlePillRadius * 2)
         }
 
         return chinWidth
@@ -295,20 +350,170 @@ struct ContentView: View {
             && hasActiveMusicLyrics
     }
 
-    private var isShowingClosedAIUsageSummaryInCenter: Bool {
-        let isShowingMusicLiveActivity = (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
+    private var isShowingMusicClosedLiveActivity: Bool {
+        (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
             && (musicManager.isPlaying || !musicManager.isPlayerIdle)
             && coordinator.musicLiveActivityEnabled
-        return vm.notchState == .closed
-            && !hasPhysicalNotch
-            && !coordinator.expandingView.show
+            && !vm.hideOnClosed
+    }
+
+    private var isShowingAIUsageClosedLiveActivity: Bool {
+        !coordinator.expandingView.show
             && enableAIUsageNotchTab
             && !vm.hideOnClosed
-            && !isShowingMusicLiveActivity
+            && !isShowingMusicClosedLiveActivity
+    }
+
+    private var isShowingSpecialClosedOverlay: Bool {
+        if coordinator.helloAnimationRunning { return true }
+        if coordinator.expandingView.type == .battery
+            && coordinator.expandingView.show
+            && Defaults[.showPowerStatusNotifications]
+        {
+            return true
+        }
+        if coordinator.sneakPeek.show
+            && (coordinator.sneakPeek.type != .music)
+            && (coordinator.sneakPeek.type != .battery)
+        {
+            return true
+        }
+        if coordinator.sneakPeek.show
+            && coordinator.sneakPeek.type == .music
+            && !vm.hideOnClosed
+            && Defaults[.sneakPeekStyles] == .standard
+        {
+            return true
+        }
+        if !coordinator.expandingView.show
+            && !isShowingMusicClosedLiveActivity
+            && !isShowingAIUsageClosedLiveActivity
+            && (!musicManager.isPlaying && musicManager.isPlayerIdle)
+            && Defaults[.showNotHumanFace]
+            && !vm.hideOnClosed
+        {
+            return true
+        }
+        return false
+    }
+
+    private var closedHorizontalPadding: CGFloat {
+        isDynamicIslandActive
+            ? closedSideClearance
+            : (cornerRadiusInsets.closed.top + closedSideClearance)
+    }
+
+    private var closedAnimatedWidth: CGFloat {
+        let side = closedLiveActivitySide
+        let gestureRightMin = max(0, side + gestureProgress / 2)
+        if isShowingMusicClosedLiveActivity {
+            let centerW: CGFloat = isInlineMusicSneakPeekActive
+                ? 380
+                : max(0, vm.closedNotchSize.width - cornerRadiusInsets.closed.top)
+            let rightW = enableAIUsageNotchTab
+                ? max(closedAIUsageEffectiveRightWidth, gestureRightMin)
+                : gestureRightMin
+            return closedAIUsageBalancedLeftWidth
+                + centerW
+                + rightW
+                + closedLiveActivitySpacing * 2
+                + closedHorizontalPadding * 2
+        }
+        if isShowingAIUsageClosedLiveActivity {
+            let centerW = max(0, vm.closedNotchSize.width - cornerRadiusInsets.closed.top)
+            let rightW = max(closedAIUsageEffectiveRightWidth, gestureRightMin)
+            return closedAIUsageBalancedLeftWidth
+                + centerW
+                + rightW
+                + closedLiveActivitySpacing * 2
+                + closedHorizontalPadding * 2
+        }
+        return closedIdleInnerWidth + closedHorizontalPadding * 2
+    }
+
+    private var isShowingClosedAIUsageSummaryInCenter: Bool {
+        vm.notchState == .closed
+            && !hasPhysicalNotch
+            && isShowingAIUsageClosedLiveActivity
     }
 
     private var shouldShowFluidMusicRim: Bool {
         enableAIUsageNotchTab && musicManager.isPlaying
+    }
+
+    private var resolvedFluidMusicRimColor: NSColor {
+        switch mediaColorStyle {
+        case .systemDefault:
+            return .white
+        case .albumArt:
+            return musicManager.avgColor
+        case .custom:
+            return MediaColorStyle.resolvedCustomNSColor(from: customMediaColorData)
+        }
+    }
+
+    private var resolvedSpectrumColor: Color {
+        switch mediaColorStyle {
+        case .systemDefault:
+            return notchInk.secondary(0.65)
+        case .albumArt:
+            return notchInk.tinted(musicManager.avgColor, darkMinBrightness: 0.5)
+        case .custom:
+            let custom = MediaColorStyle.resolvedCustomNSColor(from: customMediaColorData)
+            return notchInk.tinted(custom, darkMinBrightness: 0.5)
+        }
+    }
+
+    private var usesClearGlassForeground: Bool {
+        liquidGlassNotch && clearLiquidGlass && (vm.notchState == .open || !hasPhysicalNotch)
+    }
+
+    private var notchInk: NotchGlassInk {
+        NotchGlassInk(isClearGlass: usesClearGlassForeground)
+    }
+
+    private var isAIUsageFlightActive: Bool {
+        guard enableAIUsageNotchTab else { return false }
+        let isOpen = vm.notchState == .open
+        let inFlight = isAIUsageFlightTransitioning || (isOpen != settledAIUsageFlightOpen)
+        guard inFlight else { return false }
+        let activeTab = isOpen ? coordinator.currentView : settledAIUsageOpenTab
+        guard activeTab == .aiUsage else { return false }
+        if isOpen {
+            return aiUsageFlightHasClosedAnchor
+        } else {
+            return aiUsageFlightHasOpenAnchor && aiUsageFlightHasClosedAnchor
+        }
+    }
+
+    private func handleAIUsageNotchStateChange(_ newState: NotchState) {
+        aiUsageFlightResetTask?.cancel()
+        let newIsOpen = newState == .open
+        let activeTab = newIsOpen ? coordinator.currentView : settledAIUsageOpenTab
+        if newIsOpen {
+            settledAIUsageOpenTab = coordinator.currentView
+        }
+        let canAnimate: Bool = enableAIUsageNotchTab
+            && activeTab == .aiUsage
+            && (newIsOpen
+                ? aiUsageFlightHasClosedAnchor
+                : (aiUsageFlightHasOpenAnchor && aiUsageFlightHasClosedAnchor))
+
+        guard canAnimate else {
+            isAIUsageFlightTransitioning = false
+            settledAIUsageFlightOpen = newIsOpen
+            return
+        }
+
+        isAIUsageFlightTransitioning = true
+        let duration = newIsOpen ? NotchLyricMotion.openFlightDuration : NotchLyricMotion.closeFlightDuration
+        let settleMs = Int((duration * 1000).rounded()) + 30
+        aiUsageFlightResetTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(settleMs))
+            guard !Task.isCancelled else { return }
+            settledAIUsageFlightOpen = (vm.notchState == .open)
+            isAIUsageFlightTransitioning = false
+        }
     }
 
     var body: some View {
@@ -327,18 +532,13 @@ struct ContentView: View {
         // content coordinates (d = 14pt scaled / 10pt unscaled from the 640×226 main card body).
         let openHorizontalPadding: CGFloat = openConcentricInset + openOuterEarWidth
         let openOuterWidth: CGFloat = openNotchSize.width + openOuterEarWidth * 2
-        // Concentric closed inset: d_horizontal == d_vertical == (H_closed - side) / 2 from
-        // the visible outer side edge (with ear offset in Hanging Notch mode).
-        let closedSideClearance: CGFloat = max(2, (closedVisualHeight - closedLiveActivitySide) / 2)
-        let closedHorizontalPadding: CGFloat = isDynamicIslandActive
-            ? closedSideClearance
-            : (cornerRadiusInsets.closed.top + closedSideClearance)
         let openTopInnerPadding: CGFloat = openConcentricInset
         let openBottomInnerPadding: CGFloat = openConcentricInset
 
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
                 let mainLayout = NotchLayout()
+                    .environment(\.colorScheme, usesClearGlassForeground ? .light : .dark)
                     .frame(
                         maxWidth: vm.notchState == .open ? .infinity : nil,
                         alignment: .top
@@ -357,16 +557,21 @@ struct ContentView: View {
                         topCornerRadius: topCornerRadius,
                         bottomCornerRadius: bottomCornerRadius,
                         islandMorph: islandMorph,
+                        closedWidth: closedAnimatedWidth,
+                        openWidth: openOuterWidth,
+                        useAnimatedClosedWidth: !isShowingSpecialClosedOverlay,
                         isOpen: vm.notchState == .open,
-                        openSize: CGSize(width: openOuterWidth, height: openNotchSize.height),
-                        fallbackClosedSize: CGSize(width: vm.closedNotchSize.width, height: closedVisualHeight),
+                        openHeight: openNotchSize.height,
+                        fallbackClosedSize: CGSize(
+                            width: closedAnimatedWidth,
+                            height: closedVisualHeight
+                        ),
                         useLiquidGlass: liquidGlassNotch,
-                        useNativeIslandBackdrop: dynamicIslandShape && !hasPhysicalNotch,
                         physicalNotchSize: vm.physicalNotchSize,
                         isVisible: isNotchVisible,
                         showBaseGlassRim: showBaseGlassRim,
                         showFluidMusicRim: showFluidRim,
-                        themeColor: musicManager.avgColor
+                        themeColor: resolvedFluidMusicRimColor
                     ))
                     .conditionalModifier(!liquidGlassNotch) { view in
                         view
@@ -407,8 +612,15 @@ struct ContentView: View {
                                     : NotchLyricMotion.closeAnimation,
                                 value: vm.notchState
                             )
-                            .animation(NotchLyricMotion.openAnimation, value: isDynamicIslandActive)
                             .animation(.smooth, value: gestureProgress)
+                            .animation(
+                                enableAIUsageNotchTab
+                                    ? NotchLyricMotion.openAnimation
+                                    : NotchLyricMotion.closeAnimation,
+                                value: enableAIUsageNotchTab
+                            )
+                            .animation(NotchLyricMotion.openAnimation, value: isDynamicIslandActive)
+                            .animation(NotchLyricMotion.openAnimation, value: closedAnimatedWidth)
                             .animation(.smooth, value: musicManager.isPlaying)
                     }
                     .contentShape(Rectangle())
@@ -465,7 +677,6 @@ struct ContentView: View {
                             }
                         }
                     }
-                    .sensoryFeedback(.alignment, trigger: haptics)
                     .contextMenu {
                         Button("Settings") {
                             DispatchQueue.main.async {
@@ -526,6 +737,21 @@ struct ContentView: View {
             }
             .allowsHitTesting(false)
         }
+        .overlayPreferenceValue(NotchAIUsageAnchorKey.self) { anchors in
+            GeometryReader { proxy in
+                NotchAIUsageFlightOverlay(
+                    anchors: anchors,
+                    proxy: proxy,
+                    isOpen: vm.notchState == .open,
+                    isAIUsageTab: coordinator.currentView == .aiUsage,
+                    isFlightActive: isAIUsageFlightActive,
+                    gestureProgress: gestureProgress,
+                    hasClosedAnchor: $aiUsageFlightHasClosedAnchor,
+                    hasOpenAnchor: $aiUsageFlightHasOpenAnchor
+                )
+            }
+            .allowsHitTesting(false)
+        }
         .offset(y: dynamicIslandNegativeYOffset)
         .conditionalModifier(gestureProgress != 0 || !liquidGlassNotch) { view in
             view.compositingGroup()
@@ -553,7 +779,29 @@ struct ContentView: View {
         }
         .background(dragDetector)
         .preferredColorScheme(.dark)
+        .environment(\.notchGlassInk, notchInk)
+        .environment(\.isAIUsageFlightActive, isAIUsageFlightActive)
         .environmentObject(vm)
+        .onAppear {
+            settledAIUsageFlightOpen = (vm.notchState == .open)
+            settledAIUsageOpenTab = coordinator.currentView
+        }
+        .onChange(of: vm.notchState) { _, newState in
+            handleAIUsageNotchStateChange(newState)
+        }
+        .onChange(of: coordinator.currentView) { _, newView in
+            guard vm.notchState == .open else { return }
+            settledAIUsageOpenTab = newView
+            if newView != .aiUsage {
+                aiUsageFlightResetTask?.cancel()
+                isAIUsageFlightTransitioning = false
+                settledAIUsageFlightOpen = true
+            }
+        }
+        .onPreferenceChange(ClosedAIUsageRightWingWidthKey.self) { width in
+            guard gestureProgress == 0, width > 0, abs(width - closedAIUsageRightWingWidth) > 0.5 else { return }
+            closedAIUsageRightWingWidth = width
+        }
         .onChange(of: vm.anyDropZoneTargeting) { _, isTargeted in
             anyDropDebounceTask?.cancel()
 
@@ -608,7 +856,7 @@ struct ContentView: View {
                             HStack {
                                 Text(batteryModel.statusText)
                                     .font(.subheadline)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(notchInk.primary(1.0))
                             }
 
                             Rectangle()
@@ -637,6 +885,7 @@ struct ContentView: View {
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && enableAIUsageNotchTab && !vm.hideOnClosed {
                           AIUsageClosedLiveActivity()
                               .frame(alignment: .center)
+                              .transition(.opacity)
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
                           BoringFaceAnimation()
                        } else if vm.notchState == .open {
@@ -644,7 +893,7 @@ struct ContentView: View {
                                .frame(height: NotchHeaderMetrics.controlHeight)
                                .opacity(gestureProgress != 0 ? 1.0 - min(abs(gestureProgress) * 0.1, 0.3) : 1.0)
                        } else {
-                           Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: closedRowHeight)
+                           Rectangle().fill(.clear).frame(width: closedIdleInnerWidth, height: closedRowHeight)
                        }
 
                       if coordinator.sneakPeek.show {
@@ -665,8 +914,7 @@ struct ContentView: View {
                                   }
                               )
                               .padding(.bottom, 10)
-                              .padding(.leading, 4)
-                              .padding(.trailing, 8)
+                              .padding(.horizontal, 4)
                           }
                           // Old sneak peek music
                           else if coordinator.sneakPeek.type == .music {
@@ -674,10 +922,16 @@ struct ContentView: View {
                                   HStack(alignment: .center) {
                                       Image(systemName: "music.note")
                                       GeometryReader { geo in
-                                          MarqueeText(.constant(musicManager.songTitle + " - " + musicManager.artistName),  textColor: Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .gray, minDuration: 1, frameWidth: geo.size.width)
+                                          MarqueeText(
+                                              .constant(musicManager.songTitle + " - " + musicManager.artistName),
+                                              textColor: notchInk.secondary(0.65),
+                                              minDuration: 1,
+                                              frameWidth: geo.size.width
+                                          )
                                       }
                                   }
-                                  .foregroundStyle(.gray)
+                                  .foregroundStyle(notchInk.secondary(0.65))
+                                  .padding(.horizontal, 4)
                                   .padding(.bottom, 10)
                               }
                           }
@@ -733,10 +987,31 @@ struct ContentView: View {
     }
 
     @ViewBuilder
+    private func closedAIUsageRightWing(side: CGFloat) -> some View {
+        ClosedNotchAIUsageRingView(containerSide: side)
+            .frame(
+                minWidth: max(0, side + gestureProgress / 2),
+                minHeight: side,
+                maxHeight: side,
+                alignment: .center
+            )
+            .fixedSize(horizontal: true, vertical: false)
+            .background {
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: ClosedAIUsageRightWingWidthKey.self,
+                        value: geo.size.width
+                    )
+                }
+            }
+    }
+
+    @ViewBuilder
     func AIUsageClosedLiveActivity() -> some View {
         let side = closedLiveActivitySide
-        HStack {
+        HStack(spacing: closedLiveActivitySpacing) {
             closedAlbumArtThumbnail(side: side)
+                .frame(width: closedAIUsageBalancedLeftWidth, height: side, alignment: .leading)
 
             Rectangle()
                 .fill(liquidGlassNotch ? .clear : .black)
@@ -747,12 +1022,7 @@ struct ContentView: View {
                 }
                 .frame(width: vm.closedNotchSize.width + -cornerRadiusInsets.closed.top)
 
-            ClosedNotchAIUsageRingView(containerSide: side)
-                .frame(
-                    width: max(0, side + gestureProgress / 2),
-                    height: side,
-                    alignment: .center
-                )
+            closedAIUsageRightWing(side: side)
         }
         .frame(
             height: closedRowHeight,
@@ -784,8 +1054,9 @@ struct ContentView: View {
     @ViewBuilder
     func MusicLiveActivity() -> some View {
         let side = closedLiveActivitySide
-        HStack {
+        HStack(spacing: closedLiveActivitySpacing) {
             closedAlbumArtThumbnail(side: side)
+                .frame(width: closedAIUsageBalancedLeftWidth, height: side, alignment: .leading)
 
             Rectangle()
                 .fill(liquidGlassNotch ? .clear : .black)
@@ -796,8 +1067,7 @@ struct ContentView: View {
                         {
                             MarqueeText(
                                 .constant(musicManager.songTitle),
-                                textColor: Defaults[.coloredSpectrogram]
-                                    ? Color(nsColor: musicManager.avgColor) : Color.gray,
+                                textColor: notchInk.secondary(0.65),
                                 minDuration: 0.4,
                                 frameWidth: 100
                             )
@@ -811,11 +1081,7 @@ struct ContentView: View {
                             Text(musicManager.artistName)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
-                                .foregroundStyle(
-                                    Defaults[.coloredSpectrogram]
-                                        ? Color(nsColor: musicManager.avgColor)
-                                        : Color.gray
-                                )
+                                .foregroundStyle(notchInk.secondary(0.65))
                                 .opacity(
                                     (coordinator.expandingView.show
                                         && coordinator.expandingView.type == .music
@@ -839,40 +1105,36 @@ struct ContentView: View {
                     }
                 }
 
-            HStack {
-                if enableAIUsageNotchTab {
-                    ClosedNotchAIUsageRingView(
-                        containerSide: side
-                    )
-                } else if useMusicVisualizer {
-                    Rectangle()
-                        .fill(
-                            Defaults[.coloredSpectrogram]
-                                ? Color(nsColor: musicManager.avgColor).gradient
-                                : Color.gray.gradient
-                        )
-                        .frame(width: 50, alignment: .center)
-                        .matchedGeometryEffect(id: "spectrum", in: albumArtNamespace)
-                        .mask {
-                            AudioSpectrumView(isPlaying: $musicManager.isPlaying)
-                                .frame(
-                                    width: min(22, max(10, side * 0.85)),
-                                    height: min(16, max(8, side * 0.65))
-                                )
-                        }
-                } else {
-                    LottieAnimationContainer()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if enableAIUsageNotchTab {
+                closedAIUsageRightWing(side: side)
+            } else {
+                HStack {
+                    if useMusicVisualizer {
+                        Rectangle()
+                            .fill(resolvedSpectrumColor.gradient)
+                            .frame(width: 50, alignment: .center)
+                            .matchedGeometryEffect(id: "spectrum", in: albumArtNamespace)
+                            .mask {
+                                AudioSpectrumView(isPlaying: $musicManager.isPlaying)
+                                    .frame(
+                                        width: min(22, max(10, side * 0.85)),
+                                        height: min(16, max(8, side * 0.65))
+                                    )
+                            }
+                    } else {
+                        LottieAnimationContainer()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
+                .frame(
+                    width: max(
+                        0,
+                        side + gestureProgress / 2
+                    ),
+                    height: side,
+                    alignment: .center
+                )
             }
-            .frame(
-                width: max(
-                    0,
-                    side + gestureProgress / 2
-                ),
-                height: side,
-                alignment: .center
-            )
         }
         .frame(
             height: closedRowHeight,
@@ -910,7 +1172,8 @@ struct ContentView: View {
             ? 380
             : max(0, vm.closedNotchSize.width - cornerRadiusInsets.closed.top)
         let centerHalfWidth = centerWidth / 2
-        let offsetFromCenter = mouseLocation.x - screenFrame.midX
+        let centerShiftX: CGFloat = (closedAIUsageBalancedLeftWidth - closedAIUsageEffectiveRightWidth) / 2
+        let offsetFromCenter = mouseLocation.x - (screenFrame.midX + centerShiftX)
 
         if offsetFromCenter < -centerHalfWidth {
             return .home
@@ -953,8 +1216,8 @@ struct ContentView: View {
                 isHovering = true
             }
             
-            if vm.notchState == .closed && Defaults[.enableHaptics] {
-                haptics.toggle()
+            if vm.notchState == .closed {
+                HapticFeedbackLevel.performConfigured()
             }
             
             guard vm.notchState == .closed,
@@ -1015,9 +1278,7 @@ struct ContentView: View {
         }
 
         if translation > Defaults[.gestureSensitivity] {
-            if Defaults[.enableHaptics] {
-                haptics.toggle()
-            }
+            HapticFeedbackLevel.performConfigured()
             withAnimation(animationSpring) {
                 gestureProgress = .zero
             }
@@ -1054,10 +1315,16 @@ struct ContentView: View {
                 }
             }
 
-            if Defaults[.enableHaptics] {
-                haptics.toggle()
-            }
+            HapticFeedbackLevel.performConfigured()
         }
+    }
+}
+
+private struct ClosedAIUsageRightWingWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 

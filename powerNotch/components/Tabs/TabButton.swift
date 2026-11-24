@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct TabButton: View {
+    @Environment(\.notchGlassInk) private var ink
     let label: String
     let icon: String
     let selected: Bool
@@ -26,15 +27,15 @@ struct TabButton: View {
                 .font(.system(size: NotchHeaderMetrics.iconSize, weight: .semibold))
                 .foregroundStyle(
                     selected
-                        ? Color.white
-                        : Color.white.opacity(isHovering ? 0.84 : 0.52)
+                        ? ink.primary(1.0)
+                        : (isHovering ? ink.primary(0.84) : ink.secondary(0.56))
                 )
                 .padding(.horizontal, 12)
                 .frame(height: innerHeight)
                 .background {
                     if !selected && isHovering {
                         Capsule()
-                            .fill(Color.white.opacity(isLiquidGlass ? 0.09 : 0.07))
+                            .fill(ink.surface(isLiquidGlass ? 0.09 : 0.07))
                     }
                 }
                 .contentShape(Capsule())

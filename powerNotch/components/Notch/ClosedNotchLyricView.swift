@@ -77,6 +77,9 @@ struct NotchUnifiedLyricOverlay: View {
     let showClosedLyrics: Bool
     let showOpenLyrics: Bool
     let showBottomEdgeOpenLyrics: Bool
+    @Environment(\.notchGlassInk) private var ink
+    @Default(.mediaColorStyle) private var mediaColorStyle
+    @Default(.customMediaColorData) private var customMediaColorData
     let isLiquidGlass: Bool
     let gestureProgress: CGFloat
     var isClosedInlineInNotch: Bool = false
@@ -151,14 +154,22 @@ struct NotchUnifiedLyricOverlay: View {
     }
 
     private var closedLyricColor: Color {
-        Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.85)
+        switch mediaColorStyle {
+        case .systemDefault:
+            return .white
+        case .albumArt:
+            return Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.85)
+        case .custom:
+            let custom = MediaColorStyle.resolvedCustomNSColor(from: customMediaColorData)
+            return Color(nsColor: custom).ensureMinimumBrightness(factor: 0.85)
+        }
     }
 
     private var openLyricColor: Color {
         if musicManager.isFetchingLyrics {
-            return isLiquidGlass ? Color.white.opacity(0.50) : Color.gray.opacity(0.7)
+            return isLiquidGlass ? ink.tertiary(0.50) : Color.gray.opacity(0.7)
         }
-        return isLiquidGlass ? Color.white.opacity(0.68) : Color.gray
+        return isLiquidGlass ? ink.secondary(0.68) : Color.gray
     }
 
     private var activeFlightAnimation: Animation? {
@@ -672,9 +683,19 @@ private struct NotchLyricFlightView<Content: View>: View, Animatable {
 
 struct ClosedNotchLyricView: View {
     @ObservedObject var musicManager = MusicManager.shared
+    @Default(.mediaColorStyle) private var mediaColorStyle
+    @Default(.customMediaColorData) private var customMediaColorData
 
     private var lyricColor: Color {
-        Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.85)
+        switch mediaColorStyle {
+        case .systemDefault:
+            return .white
+        case .albumArt:
+            return Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.85)
+        case .custom:
+            let custom = MediaColorStyle.resolvedCustomNSColor(from: customMediaColorData)
+            return Color(nsColor: custom).ensureMinimumBrightness(factor: 0.85)
+        }
     }
 
     var body: some View {

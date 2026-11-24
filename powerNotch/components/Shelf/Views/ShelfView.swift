@@ -9,6 +9,7 @@ import SwiftUI
 import AppKit
 
 struct ShelfView: View {
+    @Environment(\.notchGlassInk) private var ink
     @EnvironmentObject var vm: BoringViewModel
     @StateObject var tvm = ShelfStateViewModel.shared
     @StateObject var selection = ShelfSelectionModel.shared
@@ -63,7 +64,7 @@ struct ShelfView: View {
             .stroke(
                 vm.dragDetectorTargeting
                     ? Color.accentColor.opacity(0.9)
-                    : Color.white.opacity(0.1),
+                    : ink.border(0.14),
                 style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [10])
             )
             .overlay {
@@ -84,11 +85,11 @@ struct ShelfView: View {
                     Image(systemName: "tray.and.arrow.down")
                         .symbolVariant(.fill)
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.white, .gray)
+                        .foregroundStyle(ink.primary(0.92), ink.secondary(0.60))
                         .imageScale(.large)
                     
                     Text("Drop files here")
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(ink.secondary(0.65))
                         .font(.system(.title3, design: .rounded))
                         .fontWeight(.medium)
                 }

@@ -4,9 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (for example 2.8.0 or 2.8.0-rc.1)"
+        description: "Release version (for example 0.1.0 or 0.1.0-rc.1)"
         required: true
         type: string
+        default: "0.1.0"
 
 concurrency:
   group: dev-publication
@@ -277,7 +278,7 @@ jobs:
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          repositories: powerNotch
+          repositories: ${{ github.event.repository.name }}
           permission-contents: write
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -325,8 +326,8 @@ jobs:
           fi
           printf '%s' "$SPARKLE_PRIVATE_KEY" | "$RUNNER_TEMP/generate_appcast" \
             --ed-key-file - \
-            --link "https://github.com/TheBoredTeam/powerNotch/releases" \
-            --download-url-prefix "https://github.com/TheBoredTeam/powerNotch/releases/download/v${VERSION}/" \
+            --link "https://github.com/${GITHUB_REPOSITORY}/releases" \
+            --download-url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/" \
             --embed-release-notes \
             "${CHANNEL_ARGS[@]}" \
             -o "$APPCAST_OUT" \
@@ -373,7 +374,7 @@ jobs:
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          repositories: powerNotch
+          repositories: ${{ github.event.repository.name }}
           permission-contents: write
 
       - name: Merge release PR
@@ -431,7 +432,7 @@ jobs:
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          repositories: powerNotch
+          repositories: ${{ github.event.repository.name }}
           permission-contents: write
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -506,7 +507,7 @@ jobs:
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          repositories: powerNotch
+          repositories: ${{ github.event.repository.name }}
           permission-contents: write
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -580,7 +581,7 @@ jobs:
       - name: Generate cask files
         run: |
           set -euo pipefail
-          DMG_URL="https://github.com/TheBoredTeam/powerNotch/releases/download/v${VERSION}/${PROJECT_NAME}.dmg"
+          DMG_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${PROJECT_NAME}.dmg"
 
           # Retry SHA calculation (release may need a moment to propagate)
           for attempt in 1 2 3; do
@@ -598,7 +599,7 @@ jobs:
             url "${DMG_URL}"
             name "${DISPLAY_NAME}"
             desc "${DESC}"
-            homepage "https://github.com/TheBoredTeam/powerNotch"
+            homepage "https://github.com/${GITHUB_REPOSITORY}"
             livecheck do
               url :url
               strategy :github_latest
@@ -606,12 +607,6 @@ jobs:
             auto_updates true
             depends_on macos: :sonoma
             app "powerNotch.app"
-
-            postflight do
-              app_path = appdir/"powerNotch.app"
-              next unless app_path.exist?
-              system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", app_path]
-            end
 
             uninstall quit: "com.powernotch.app"
 
@@ -642,12 +637,13 @@ jobs:
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          repositories: homebrew-power-notch
+          owner: ${{ github.repository_owner }}
+          repositories: homebrew-tap
           permission-contents: write
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: TheBoredTeam/homebrew-power-notch
+          repository: ${{ github.repository_owner }}/homebrew-tap
           path: homebrew-tap
           persist-credentials: false
 
@@ -655,6 +651,7 @@ jobs:
         id: update_casks
         run: |
           set -euo pipefail
+          mkdir -p homebrew-tap/Casks
           cp power-notch@rc.rb homebrew-tap/Casks/power-notch@rc.rb
           COMMIT_MSG="Update power-notch@rc to v${VERSION}"
           if [[ "${IS_BETA}" == "false" ]]; then

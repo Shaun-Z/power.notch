@@ -1323,6 +1323,9 @@
     "↻ %@" : {
 
     },
+    "↻%@" : {
+
+    },
     "+%lld" : {
 
     },
@@ -2234,6 +2237,9 @@
       }
     },
     "AI Usage" : {
+
+    },
+    "All displays" : {
 
     },
     "All-day" : {
@@ -3161,6 +3167,7 @@
       }
     },
     "Automatically switch displays" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -4860,6 +4867,9 @@
         }
       }
     },
+    "Choose Notch, Dynamic Island, or Off independently for each connected display." : {
+
+    },
     "Choose which service to use when sharing files from the shelf. Click the shelf button to select files, or drag files onto it to share immediately." : {
       "localizations" : {
         "ar" : {
@@ -5466,6 +5476,9 @@
     "Code:" : {
 
     },
+    "Color" : {
+
+    },
     "Color Presets" : {
       "localizations" : {
         "ar" : {
@@ -5567,6 +5580,7 @@
       }
     },
     "Colored spectrogram" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -5665,9 +5679,6 @@
           }
         }
       }
-    },
-    "Colorless clear glass" : {
-
     },
     "Coming soon" : {
       "localizations" : {
@@ -6284,6 +6295,12 @@
     "Custom Base URL (Optional):" : {
 
     },
+    "Custom color" : {
+
+    },
+    "Custom glass color" : {
+
+    },
     "Custom height" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6886,7 +6903,7 @@
         }
       }
     },
-    "Dark glass (Default)" : {
+    "Dark" : {
 
     },
     "Default" : {
@@ -7805,13 +7822,13 @@
         }
       }
     },
-    "Dynamic Island expanded shape" : {
+    "Dynamic Island" : {
+
+    },
+    "Dynamic Island is currently turned off in General settings. Values configured here take effect once Dynamic Island is selected for a display." : {
 
     },
     "Dynamic Island layout" : {
-
-    },
-    "Dynamic Island shape is currently turned off in Appearance settings. Values configured here take effect once Dynamic Island is enabled." : {
 
     },
     "Easily copy, store, and manage your most-used content. Upgrade now for advanced features like multi-item storage and quick access!" : {
@@ -8015,6 +8032,7 @@
       }
     },
     "Enable blur effect behind album art" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -8516,6 +8534,7 @@
       }
     },
     "Enable haptic feedback" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -9534,6 +9553,9 @@
         }
       }
     },
+    "Follow system" : {
+
+    },
     "Full screen behavior" : {
       "localizations" : {
         "ar" : {
@@ -10134,12 +10156,6 @@
         }
       }
     },
-    "Glass opacity" : {
-
-    },
-    "Glass tint" : {
-
-    },
     "Got it!" : {
       "localizations" : {
         "ar" : {
@@ -10339,6 +10355,9 @@
           }
         }
       }
+    },
+    "Haptic feedback" : {
+
     },
     "Hide" : {
 
@@ -11652,9 +11671,6 @@
     "Independently adjust each enabled display's Dynamic Island vertical offset relative to its default position (positive moves down, negative moves up) and closed total height in points. Inner elements scale automatically." : {
 
     },
-    "Independently choose whether the notch is shown on each connected display." : {
-
-    },
     "Inline" : {
       "localizations" : {
         "ar" : {
@@ -11959,16 +11975,10 @@
     "Left %" : {
 
     },
+    "Light" : {
+
+    },
     "Liquid Glass" : {
-
-    },
-    "Liquid Glass & Dynamic Island" : {
-
-    },
-    "Liquid Glass expanded notch" : {
-
-    },
-    "Liquid Glass is currently turned off in Appearance settings. Enable it there to preview the glass style." : {
 
     },
     "Live Usage & Balances" : {
@@ -13083,6 +13093,9 @@
         }
       }
     },
+    "Media color" : {
+
+    },
     "Media controls" : {
       "localizations" : {
         "ar" : {
@@ -13987,9 +14000,6 @@
 
     },
     "More transparent" : {
-
-    },
-    "Morph expanded wings and card into a rounded Dynamic Island contour matching inner corners" : {
 
     },
     "Music Source" : {
@@ -15407,6 +15417,9 @@
         }
       }
     },
+    "Notch mode" : {
+
+    },
     "Notch sizing" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -15508,7 +15521,13 @@
         }
       }
     },
+    "Off" : {
+
+    },
     "Off by default to avoid macOS Keychain prompts. File credentials (`~/.codex`, `~/.claude`, `~/.gemini`, `~/.local/share/opencode`) are read without Keychain prompts." : {
+
+    },
+    "Opacity" : {
 
     },
     "Open %@ Dashboard" : {
@@ -20370,6 +20389,7 @@
 
     },
     "Slider color" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -21170,15 +21190,6 @@
           }
         }
       }
-    },
-    "Switch between the default dark tinted Liquid Glass and colorless transparent clear glass." : {
-
-    },
-    "Switch to clear glass" : {
-
-    },
-    "Switch to dark glass" : {
-
     },
     "System" : {
       "localizations" : {
@@ -22389,6 +22400,9 @@
           }
         }
       }
+    },
+    "Use Liquid Glass" : {
+
     },
     "Use music visualizer spectrogram" : {
       "localizations" : {

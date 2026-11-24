@@ -25,15 +25,6 @@ struct AIUsageWidgetPayload: Codable, Sendable {
     let providers: [AIUsageWidgetProviderPage]
 }
 
-struct AIUsageWidgetDailyPoint: Codable, Identifiable, Sendable, Equatable {
-    let dayKey: String      // "YYYY-MM-DD" in local timezone
-    let tokens: Int64
-    let cost: Double
-    let requests: Int
-
-    var id: String { dayKey }
-}
-
 struct AIUsageWidgetProviderPage: Codable, Identifiable, Sendable, Equatable {
     let id: String
     let displayName: String
@@ -146,11 +137,7 @@ enum AIUsageWidgetSync {
             }
 
             let history = dailyHistories[provider] ?? []
-            let currencySymbol = resolvedCurrencySymbol(
-                for: provider,
-                currency: snap?.balance?.currency,
-                dailyHistory: history
-            )
+            let currencySymbol = history.compactMap(\.selectedCost).first?.chartCurrencyPrefix ?? ""
 
             return AIUsageWidgetProviderPage(
                 id: provider.rawValue,
@@ -178,7 +165,7 @@ enum AIUsageWidgetSync {
         }
 
         let payload = AIUsageWidgetPayload(
-            schemaVersion: 2,
+            schemaVersion: 3,
             updatedAt: Date(),
             showRemainingPercent: showRemainingPercent,
             hideAccountEmails: hideAccountEmails,
@@ -200,41 +187,6 @@ enum AIUsageWidgetSync {
         }
 
         WidgetCenter.shared.reloadTimelines(ofKind: AIUsageWidgetBridgeConstants.widgetKind)
-    }
-
-    private static func resolvedCurrencySymbol(
-        for provider: AIProviderID,
-        currency: String?,
-        dailyHistory: [AIUsageWidgetDailyPoint]
-    ) -> String {
-        // Local CLI/IDE token & cost logs (Pi, OpenCode, Copilot, Codex, Claude, Antigravity)
-        // record API-equivalent spend in USD. Only use non-USD balance currency when spend comes
-        // purely from balance-delta tracking (no local token records).
-        if dailyHistory.contains(where: { $0.tokens > 0 }) {
-            return "$"
-        }
-        if let code = currency?.uppercased() {
-            switch code {
-            case "CNY", "RMB", "¥":
-                return "¥"
-            case "EUR", "€":
-                return "€"
-            case "GBP", "£":
-                return "£"
-            case "JPY":
-                return "¥"
-            case "USD", "$":
-                return "$"
-            default:
-                break
-            }
-        }
-        switch provider {
-        case .mimo, .deepseek:
-            return "¥"
-        default:
-            return "$"
-        }
     }
 
     private static func rgbComponents(for color: SwiftUI.Color) -> (r: Double, g: Double, b: Double) {

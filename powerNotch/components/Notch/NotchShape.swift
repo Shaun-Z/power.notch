@@ -253,10 +253,11 @@ struct NotchRimShape: Shape {
 
     func path(in rect: CGRect) -> Path {
         let m = min(1, max(0, islandMorph))
-        // On an unpadded interior canvas (canvasBleed == 0), nudge Dynamic Island strokes slightly
-        // inward to keep full stroke weight inside bounds; on an expanded exterior canvas, apply
-        // `edgeOffset` directly from the exact outer bezel boundary.
-        let effectiveOffset = canvasBleed > 0 ? edgeOffset : (edgeOffset - 0.4 * m)
+        // On an unpadded interior canvas (canvasBleed == 0), gently bias Dynamic Island strokes
+        // inward by 0.20pt so the clipped hairline sits flush on the exact 0.00pt outer glass edge
+        // with zero visible gap or double rim; on an expanded exterior canvas, apply `edgeOffset`
+        // directly from the outer bezel boundary.
+        let effectiveOffset = canvasBleed > 0 ? edgeOffset : (edgeOffset - 0.20 * m)
         let horizontalInset = canvasBleed - effectiveOffset
         let topInset = includeTopEdge ? (canvasBleed - effectiveOffset) : 0
         let bottomInset = canvasBleed - effectiveOffset
@@ -350,45 +351,13 @@ struct NotchExteriorClipShape: Shape {
     }
 }
 
-/// AppKit's native rounded glass surface for Dynamic Island mode.
-/// Keep the effect view unmasked so AppKit controls its own glass edge rendering.
-@available(macOS 26.0, *)
-private struct NativeIslandGlassBackdrop: NSViewRepresentable {
-    let cornerRadius: CGFloat
-    let useClearGlass: Bool
-
-    private var resolvedTintColor: NSColor? {
-        useClearGlass ? nil : .black.withAlphaComponent(LiquidGlassAppearance.tintOpacity)
-    }
-
-    func makeNSView(context: Context) -> NSGlassEffectView {
-        let view = NSGlassEffectView()
-        view.style = .clear
-        view.tintColor = resolvedTintColor
-        view.cornerRadius = cornerRadius
-        return view
-    }
-
-    func updateNSView(_ nsView: NSGlassEffectView, context: Context) {
-        if nsView.tintColor != resolvedTintColor {
-            nsView.tintColor = resolvedTintColor
-        }
-        if context.transaction.animation == nil {
-            nsView.cornerRadius = cornerRadius
-        } else {
-            context.animate {
-                nsView.animator().cornerRadius = cornerRadius
-            }
-        }
-    }
-}
-
 /// Measures the closed content, but gets every intermediate size from the surface's single driver.
 private struct NotchSurfaceLayout: Layout {
     var progress: CGFloat
     let isOpen: Bool
     let openSize: CGSize
     let fallbackClosedSize: CGSize
+    let closedWidthOverride: CGFloat?
 
     struct Cache {
         var closedSize: CGSize
@@ -409,9 +378,10 @@ private struct NotchSurfaceLayout: Layout {
                 cache.closedSize = measured
             }
         }
+        let closedWidth = closedWidthOverride ?? cache.closedSize.width
         let p = min(1, max(0, progress))
         return CGSize(
-            width: max(0, cache.closedSize.width + (openSize.width - cache.closedSize.width) * p),
+            width: max(0, closedWidth + (openSize.width - closedWidth) * p),
             height: max(0, cache.closedSize.height + (openSize.height - cache.closedSize.height) * p)
         )
     }
@@ -429,21 +399,33 @@ struct NotchCardSurface: AnimatableModifier {
     var topCornerRadius: CGFloat
     var bottomCornerRadius: CGFloat
     var islandMorph: CGFloat
+    var closedWidth: CGFloat
+    var openWidth: CGFloat
+    let useAnimatedClosedWidth: Bool
     let isOpen: Bool
-    let openSize: CGSize
+    let openHeight: CGFloat
     let fallbackClosedSize: CGSize
     let useLiquidGlass: Bool
-    let useNativeIslandBackdrop: Bool
     let physicalNotchSize: CGSize?
     let isVisible: Bool
     let showBaseGlassRim: Bool
     let showFluidMusicRim: Bool
     let themeColor: NSColor
 
-    var animatableData: AnimatablePair<CGFloat, AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>>> {
-        get { .init(openProgress, .init(topCornerRadius, .init(bottomCornerRadius, islandMorph))) }
+    var animatableData: AnimatablePair<
+        AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>>,
+        AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>>
+    > {
+        get {
+            .init(
+                .init(openProgress, .init(closedWidth, openWidth)),
+                .init(topCornerRadius, .init(bottomCornerRadius, islandMorph))
+            )
+        }
         set {
-            openProgress = min(1, max(0, newValue.first))
+            openProgress = min(1, max(0, newValue.first.first))
+            closedWidth = max(0, newValue.first.second.first)
+            openWidth = max(0, newValue.first.second.second)
             topCornerRadius = max(0, newValue.second.first)
             bottomCornerRadius = max(0, newValue.second.second.first)
             islandMorph = min(1, max(0, newValue.second.second.second))
@@ -464,8 +446,9 @@ struct NotchCardSurface: AnimatableModifier {
             NotchSurfaceLayout(
                 progress: openProgress,
                 isOpen: isOpen,
-                openSize: openSize,
-                fallbackClosedSize: fallbackClosedSize
+                openSize: CGSize(width: openWidth, height: openHeight),
+                fallbackClosedSize: fallbackClosedSize,
+                closedWidthOverride: useAnimatedClosedWidth ? closedWidth : nil
             ) {
                 inner
             }
@@ -478,7 +461,6 @@ struct NotchCardSurface: AnimatableModifier {
                     topCornerRadius: topCornerRadius,
                     bottomCornerRadius: bottomCornerRadius,
                     islandMorph: islandMorph,
-                    useNativeIslandBackdrop: useNativeIslandBackdrop,
                     physicalNotchSize: physicalNotchSize,
                     isVisible: isVisible,
                     showRim: false
@@ -578,6 +560,16 @@ struct HardwareNotchInkTransition: View, Animatable {
 struct NotchGlassBackground: View {
     @Default(.liquidGlassOpacity) private var liquidGlassOpacity
     @Default(.developerClearLiquidGlass) private var clearLiquidGlass
+    @Default(.liquidGlassAppearanceMode) private var glassAppearanceMode
+    @Default(.customGlassColorData) private var customGlassColorData
+
+    private var glassTint: Color {
+        if glassAppearanceMode == .custom {
+            return Color(nsColor: LiquidGlassAppearance.customColor(from: customGlassColorData))
+                .opacity(LiquidGlassAppearance.tintOpacity)
+        }
+        return clearLiquidGlass ? .clear : .black.opacity(LiquidGlassAppearance.tintOpacity)
+    }
 
     let isOpen: Bool
     let useLiquidGlass: Bool
@@ -585,19 +577,22 @@ struct NotchGlassBackground: View {
     let topCornerRadius: CGFloat
     let bottomCornerRadius: CGFloat
     var islandMorph: CGFloat = 0
-    // Stable across open/close: only use AppKit when both endpoints remain rounded islands.
-    var useNativeIslandBackdrop: Bool = false
     var physicalNotchSize: CGSize? = nil
     var isVisible: Bool = true
     var showFluidMusicRim: Bool = false
     var themeColor: NSColor = .white
     var showRim: Bool = true
 
-    private var suppressTopReflection: Bool {
-        if clearLiquidGlass && (physicalNotchSize?.height ?? 0) == 0 {
-            return false
+    /// Continuous suppression factor (`0` = full 360° Dynamic Island glass edge, `1` = top bezel
+    /// specular line suppressed against screen top edge / physical hardware notch).
+    private var topSuppression: CGFloat {
+        if (physicalNotchSize?.height ?? 0) > 0 {
+            return 1
         }
-        return islandMorph < 1 || (physicalNotchSize?.height ?? 0) > 0
+        if clearLiquidGlass {
+            return 0
+        }
+        return 1 - min(1, max(0, islandMorph))
     }
 
     private var activeNotchShape: NotchShape {
@@ -610,27 +605,44 @@ struct NotchGlassBackground: View {
     }
 
     var body: some View {
+        let suppression = topSuppression
         ZStack(alignment: .top) {
             if useLiquidGlass {
                 nativeGlassBackdrop
                     .mask {
-                        // Keep the native side/bottom refraction, but discard its top specular band.
+                        // Keep native side/bottom refraction, and smoothly suppress the top 2pt
+                        // specular band only while flush against the top bezel (`suppression -> 1`).
                         GeometryReader { geometry in
-                            Path { path in
-                                let topInset: CGFloat = suppressTopReflection ? 2 : -16
-                                path.addRect(CGRect(
-                                    x: -16,
-                                    y: topInset,
-                                    width: geometry.size.width + 32,
-                                    height: geometry.size.height + 16 - topInset
-                                ))
-                            }
-                            .fill(.white)
+                            let pad: CGFloat = 16
+                            let totalH = max(1, geometry.size.height + pad * 2)
+                            let cutStop = min(1, (pad + 2) / totalH)
+                            let edgeStop = max(0, cutStop - 0.5 / totalH)
+                            Rectangle()
+                                .fill(
+                                    LinearGradient(
+                                        stops: suppression <= 0.001
+                                            ? [
+                                                .init(color: .white, location: 0.0),
+                                                .init(color: .white, location: 1.0)
+                                            ]
+                                            : [
+                                                .init(color: .white.opacity(1 - suppression), location: 0.0),
+                                                .init(color: .white.opacity(1 - suppression), location: edgeStop),
+                                                .init(color: .white, location: cutStop),
+                                                .init(color: .white, location: 1.0)
+                                            ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .frame(width: geometry.size.width + pad * 2, height: totalH)
+                                .offset(x: -pad, y: -pad)
                         }
                     }
                     .overlay(alignment: .top) {
-                        if suppressTopReflection {
+                        if suppression > 0.001 {
                             Color.black
+                                .opacity(suppression)
                                 .frame(height: 2)
                                 .frame(maxHeight: .infinity, alignment: .top)
                                 .clipShape(activeNotchShape)
@@ -682,30 +694,22 @@ struct NotchGlassBackground: View {
     @ViewBuilder
     private var nativeGlassBackdrop: some View {
         if #available(macOS 26.0, *) {
-            Group {
-                if useNativeIslandBackdrop {
-                    NativeIslandGlassBackdrop(
-                        cornerRadius: topCornerRadius,
-                        useClearGlass: clearLiquidGlass
-                    )
-                } else {
-                    Color.clear
-                        .glassEffect(
-                            clearLiquidGlass
-                                ? .clear
-                                : .clear.tint(.black.opacity(LiquidGlassAppearance.tintOpacity)),
-                            in: activeNotchShape
-                        )
-                }
-            }
-            .opacity(isVisible ? 1 : 0)
-            .allowsHitTesting(false)
+            // Always drive macOS 26 Liquid Glass directly from `activeNotchShape` so the glass
+            // body, content clip, and specular rim stay locked as one unified surface across
+            // open/close and Hanging Notch <-> Dynamic Island morphing on all displays.
+            Color.clear
+                .glassEffect(
+                    glassAppearanceMode != .custom && clearLiquidGlass
+                        ? .clear
+                        : .clear.tint(glassTint),
+                    in: activeNotchShape
+                )
+                .opacity(isVisible ? 1 : 0)
+                .allowsHitTesting(false)
         } else {
             VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
                 .overlay {
-                    if !clearLiquidGlass {
-                        Color.black.opacity(LiquidGlassAppearance.tintOpacity)
-                    }
+                    glassTint
                 }
                 .clipShape(activeNotchShape)
                 .opacity(isVisible ? min(1, max(0, liquidGlassOpacity)) : 0)
@@ -742,10 +746,16 @@ struct NotchLiquidGlassRim: View {
     private let haloBleed: CGFloat = 18
     private let glassRimBleed: CGFloat = 6
 
-    /// True for the floating Dynamic Island on non-notched displays, where the top edge floats
-    /// below the screen bezel and the full 360° perimeter carries glass reflection & music glow.
+    /// Continuous top-edge visibility (`0` in Hanging Notch / physical-notch modes, smoothly
+    /// ramping to `1` in Dynamic Island mode on non-notched displays with zero mid-morph snap).
+    private var topEdgePresence: CGFloat {
+        outwardMusicGlow ? 0 : min(1, max(0, islandMorph))
+    }
+
+    /// Always close the top edge on non-notched displays so the path topology never snaps at
+    /// `islandMorph == 0.5`; `topEdgeFadeMask` smoothly fades the top edge in/out with `islandMorph`.
     private var includeTopEdge: Bool {
-        !outwardMusicGlow && islandMorph >= 0.5
+        !outwardMusicGlow
     }
 
     private var rimShape: NotchRimShape {
@@ -824,24 +834,23 @@ struct NotchLiquidGlassRim: View {
 
     @ViewBuilder
     private var topEdgeFadeMask: some View {
-        if includeTopEdge {
+        let presence = topEdgePresence
+        if presence >= 0.999 {
             // Floating Dynamic Island on non-notched displays: illuminate the entire 360° perimeter
             // including the top edge with zero top-edge fade suppression.
             Color.white
         } else {
             GeometryReader { geometry in
-                // Only feather the immediate top screen-bezel contact line (y = 0) so the flat top
-                // edge never shows a horizontal specular bar or clipped blur cap, while preserving
-                // full Liquid Glass reflection and music glow along the upper-left/upper-right
-                // corners and vertical side walls.
+                // Smoothly interpolate top-bezel fade from `0` (Hanging Notch) to `1` (Dynamic
+                // Island) so the top specular rim glides in/out continuously during morphing.
                 let height = max(1, geometry.size.height)
                 let clearStop = min(0.02, 1.0 / height)
                 let fadeDistance: CGFloat = isOpen ? 6.0 : 3.0
                 let fullStop = max(clearStop + 0.01, min(0.14, fadeDistance / height))
                 LinearGradient(
                     stops: [
-                        .init(color: .clear, location: 0.0),
-                        .init(color: .clear, location: clearStop),
+                        .init(color: .white.opacity(presence), location: 0.0),
+                        .init(color: .white.opacity(presence), location: clearStop),
                         .init(color: .white, location: fullStop),
                         .init(color: .white, location: 1.0)
                     ],
@@ -1049,22 +1058,17 @@ struct NotchLiquidGlassRim: View {
         shape: NotchRimShape,
         clipExterior: Bool
     ) -> some View {
+        let topSheenOpacity = 0.03 + 0.12 * topEdgePresence
         let rimContent = ZStack {
             // 1. Whisper-fine optical glass edge refraction (replaces heavy inner caustic band)
             let sheen = shape
                 .stroke(
                     LinearGradient(
-                        stops: includeTopEdge
-                            ? [
-                                .init(color: Color.white.opacity(0.15), location: 0.0),
-                                .init(color: Color.white.opacity(0.08), location: 0.50),
-                                .init(color: Color.white.opacity(0.16), location: 1.0)
-                            ]
-                            : [
-                                .init(color: Color.white.opacity(0.03), location: 0.0),
-                                .init(color: Color.white.opacity(0.09), location: 0.50),
-                                .init(color: Color.white.opacity(0.16), location: 1.0)
-                            ],
+                        stops: [
+                            .init(color: Color.white.opacity(topSheenOpacity), location: 0.0),
+                            .init(color: Color.white.opacity(0.085), location: 0.50),
+                            .init(color: Color.white.opacity(0.16), location: 1.0)
+                        ],
                         startPoint: .top,
                         endPoint: .bottom
                     ),
@@ -1240,15 +1244,16 @@ struct NotchLiquidGlassRim: View {
                         endRadius: maxDim * (0.12 + treble * 0.12)
                     )
 
-                    if includeTopEdge {
+                    if topEdgePresence > 0.001 {
                         // Top-edge harmonic fluid pulse & counter-gliding specular crest so the
-                        // entire 360° perimeter of the floating Dynamic Island glows evenly.
+                        // entire 360° perimeter of the floating Dynamic Island glows evenly,
+                        // fading smoothly in/out during Hanging Notch <-> Dynamic Island morphing.
                         let topPulseX = 0.50 - 0.12 * cos(t * 1.55 + 0.5)
                         let topCrestX = 0.50 - 0.36 * sin(t * 1.25 + 0.9)
 
                         RadialGradient(
                             colors: [
-                                palette.primary.opacity(0.44 + mid * 0.48),
+                                palette.primary.opacity((0.44 + mid * 0.48) * topEdgePresence),
                                 palette.primary.opacity(0.0)
                             ],
                             center: UnitPoint(x: topPulseX, y: 0.0),
@@ -1258,7 +1263,7 @@ struct NotchLiquidGlassRim: View {
 
                         RadialGradient(
                             colors: [
-                                palette.highlight.opacity(0.38 + treble * 0.50),
+                                palette.highlight.opacity((0.38 + treble * 0.50) * topEdgePresence),
                                 palette.highlight.opacity(0.0)
                             ],
                             center: UnitPoint(x: topCrestX, y: 0.04),

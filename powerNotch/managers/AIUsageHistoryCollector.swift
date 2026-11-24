@@ -4,7 +4,7 @@
 //
 //  Collects 30-day daily usage history (tokens, spend, requests) per AI provider from:
 //  - Local Antigravity SQLite conversation DBs
-//  - Local OpenAI Codex state_5.sqlite & rollout JSONL sessions
+//  - Timestamped local OpenAI Codex rollout JSONL sessions
 //  - Local Claude Code project JSONL logs
 //  - Local OpenCode SQLite database (mapped across providers)
 //  - Persistent 30-day rolling balance-delta ledger for API balance providers (DeepSeek, MiMo, OpenRouter, etc.)
@@ -12,18 +12,6 @@
 
 import Foundation
 import SQLite3
-
-struct AIUsageDailyBucket: Sendable {
-    var tokens: Int64 = 0
-    var cost: Double = 0
-    var requests: Int = 0
-}
-
-private struct AIUsageLedgerEntry: Codable, Sendable {
-    var tokens: Int64 = 0
-    var cost: Double = 0
-    var requests: Int = 0
-}
 
 private struct AIUsageProviderLedger: Codable, Sendable {
     var lastObservedRemaining: Double?
@@ -37,6 +25,7 @@ private struct AIUsagePersistentLedger: Codable, Sendable {
 }
 
 enum AIUsageHistoryCollector {
+    private static let ledgerLock = NSLock()
     private static let ledgerFileName = "ai-usage-daily-ledger.json"
 
     private static func ledgerFileURL() -> URL? {
@@ -75,6 +64,8 @@ enum AIUsageHistoryCollector {
         now: Date = Date()
     ) {
         guard let url = ledgerFileURL() else { return }
+        ledgerLock.lock()
+        defer { ledgerLock.unlock() }
         var ledger = loadLedger(from: url)
         let validKeys = Set(recentDayKeys(days: 35, now: now))
         let todayKey = makeDayFormatter().string(from: now)
@@ -87,13 +78,14 @@ enum AIUsageHistoryCollector {
             if let balance = snapshot.balance {
                 let currency = balance.currency.uppercased()
                 if let remaining = balance.remaining {
+                    pLedger.lastObservedUsedThisPeriod = nil
                     if let prev = pLedger.lastObservedRemaining,
                        pLedger.lastObservedCurrency == currency
                     {
                         let spentDelta = prev - remaining
                         if spentDelta > 0.0001 {
                             var entry = pLedger.daily[todayKey] ?? AIUsageLedgerEntry()
-                            entry.cost += spentDelta
+                            entry.addBalanceDelta(spentDelta, currency: currency)
                             if entry.requests == 0 {
                                 entry.requests = 1
                             }
@@ -103,13 +95,14 @@ enum AIUsageHistoryCollector {
                     pLedger.lastObservedRemaining = remaining
                     pLedger.lastObservedCurrency = currency
                 } else if let used = balance.usedThisPeriod {
+                    pLedger.lastObservedRemaining = nil
                     if let prevUsed = pLedger.lastObservedUsedThisPeriod,
                        pLedger.lastObservedCurrency == currency
                     {
                         let usedDelta = used - prevUsed
                         if usedDelta > 0.0001 {
                             var entry = pLedger.daily[todayKey] ?? AIUsageLedgerEntry()
-                            entry.cost += usedDelta
+                            entry.addBalanceDelta(usedDelta, currency: currency)
                             pLedger.daily[todayKey] = entry
                         }
                     }
@@ -179,12 +172,11 @@ enum AIUsageHistoryCollector {
             }
         }
 
-        // 3. Codex local SQLite (state_5.sqlite) + rollout sessions
+        // 3. Codex timestamped rollout sessions
         if providers.contains(.codex) {
             let codexBuckets = scanCodex30Days(
                 homePath: realUserHomePath,
                 cutoffDate: cutoffDate,
-                cutoffSec: cutoffSec,
                 validKeys: validKeySet,
                 formatter: formatter
             )
@@ -248,34 +240,35 @@ enum AIUsageHistoryCollector {
             }
         }
 
-        // 7. Merge persistent balance-delta ledger
+        // Keep balance observations separate from USD local estimates, including their currency.
+        var ledgerCosts: [AIProviderID: [String: AIUsageLedgerEntry]] = [:]
         if let url = ledgerFileURL() {
+            ledgerLock.lock()
             let ledger = loadLedger(from: url)
+            ledgerLock.unlock()
             for provider in providers {
-                guard let pLedger = ledger.providers[provider.rawValue] else { continue }
-                for (day, entry) in pLedger.daily where validKeySet.contains(day) {
-                    var existing = bucketsByProvider[provider]?[day] ?? AIUsageDailyBucket()
-                    existing.tokens = max(existing.tokens, entry.tokens)
-                    existing.cost = max(existing.cost, entry.cost)
-                    existing.requests = max(existing.requests, entry.requests)
-                    bucketsByProvider[provider]?[day] = existing
-                }
+                ledgerCosts[provider] = ledger.providers[provider.rawValue]?.daily
             }
         }
 
-        // Build contiguous 30-day arrays
         var result: [AIProviderID: [AIUsageWidgetDailyPoint]] = [:]
         for provider in providers {
             let map = bucketsByProvider[provider] ?? [:]
-            result[provider] = dayKeys.map { key in
-                let b = map[key] ?? AIUsageDailyBucket()
+            let points = dayKeys.map { key in
+                let bucket = map[key] ?? AIUsageDailyBucket()
+                let observation = ledgerCosts[provider]?[key]
+                var costs = observation?.costs ?? []
+                if bucket.cost > 0 {
+                    costs.append(AIUsageCost(amount: bucket.cost, currency: "USD", source: .localEstimate))
+                }
                 return AIUsageWidgetDailyPoint(
                     dayKey: key,
-                    tokens: b.tokens,
-                    cost: b.cost,
-                    requests: b.requests
+                    tokens: bucket.tokens,
+                    requests: bucket.requests,
+                    costs: costs
                 )
             }
+            result[provider] = AIUsageCostSeries.select(points, preferredCurrency: snapshots[provider]?.balance?.currency)
         }
         return result
     }
@@ -571,147 +564,36 @@ enum AIUsageHistoryCollector {
     nonisolated private static func scanCodex30Days(
         homePath: String,
         cutoffDate: Date,
-        cutoffSec: Int64,
         validKeys: Set<String>,
         formatter: DateFormatter
     ) -> [String: AIUsageDailyBucket] {
         var byDay: [String: AIUsageDailyBucket] = [:]
 
-        // 1. Read ~/.codex/state_5.sqlite threads table
-        let stateDBPath = "\(homePath)/.codex/state_5.sqlite"
-        if FileManager.default.fileExists(atPath: stateDBPath) {
-            var db: OpaquePointer?
-            if sqlite3_open_v2(stateDBPath, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, nil) == SQLITE_OK,
-               let db
-            {
-                defer { sqlite3_close(db) }
-                let sql = """
-                    SELECT updated_at, tokens_used
-                    FROM threads
-                    WHERE updated_at >= ?;
-                    """
-                var stmt: OpaquePointer?
-                if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt {
-                    defer { sqlite3_finalize(stmt) }
-                    sqlite3_bind_int64(stmt, 1, cutoffSec)
-                    while sqlite3_step(stmt) == SQLITE_ROW {
-                        let ts = sqlite3_column_int64(stmt, 0)
-                        let tokens = max(0, sqlite3_column_int64(stmt, 1))
-                        let dayKey = formatter.string(from: Date(timeIntervalSince1970: TimeInterval(ts)))
-                        guard validKeys.contains(dayKey) else { continue }
-
-                        var bucket = byDay[dayKey] ?? AIUsageDailyBucket()
-                        bucket.tokens += tokens
-                        bucket.requests += 1
-                        // Blended Codex API-equivalent cost (~$1.60 / 1M tokens accounting for prompt caching)
-                        if tokens > 0 {
-                            bucket.cost += Double(tokens) / 1_000_000.0 * 1.60
-                        }
-                        byDay[dayKey] = bucket
-                    }
-                }
-            }
-        }
-
-        // 2. Scan ~/.codex/sessions/YYYY/MM/DD/*.jsonl for detailed token_count & turn counts
+        // Thread-level SQLite counters have no daily allocation: attributing an entire
+        // session to updated_at invents daily usage and can double-count cross-day rollouts.
+        // Only timestamped rollout increments can contribute to the daily chart.
         let sessionsRoot = URL(fileURLWithPath: "\(homePath)/.codex/sessions")
         let fm = FileManager.default
-        if fm.fileExists(atPath: sessionsRoot.path) {
-            var rolloutByDay: [String: AIUsageDailyBucket] = [:]
-            if let enumerator = fm.enumerator(
-                at: sessionsRoot,
-                includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            ) {
-                for case let fileURL as URL in enumerator {
-                    guard fileURL.pathExtension == "jsonl" else { continue }
-                    if let vals = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]),
-                       let mtime = vals.contentModificationDate,
-                       mtime < cutoffDate
-                    {
-                        continue
-                    }
+        guard let enumerator = fm.enumerator(
+            at: sessionsRoot,
+            includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [:] }
 
-                    // Derive day from path .../sessions/YYYY/MM/DD/... or mtime
-                    let pathComps = fileURL.pathComponents
-                    var fileDayKey: String?
-                    if pathComps.count >= 4 {
-                        let candidate = "\(pathComps[pathComps.count - 4])-\(pathComps[pathComps.count - 3])-\(pathComps[pathComps.count - 2])"
-                        if validKeys.contains(candidate) {
-                            fileDayKey = candidate
-                        }
-                    }
-                    if fileDayKey == nil,
-                       let mtime = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-                    {
-                        let key = formatter.string(from: mtime)
-                        if validKeys.contains(key) { fileDayKey = key }
-                    }
-                    guard let dayKey = fileDayKey else { continue }
-
-                    guard let text = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
-                    var lastTotal: Int64 = 0
-                    var fileTokens: Int64 = 0
-                    var fileCost: Double = 0
-                    var fileRequests = 0
-
-                    for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
-                        if line.contains("\"token_count\""),
-                           let data = line.data(using: .utf8),
-                           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                           let payload = obj["payload"] as? [String: Any],
-                           (payload["type"] as? String) == "token_count",
-                           let info = payload["info"] as? [String: Any]
-                        {
-                            if let lastUsage = info["last_token_usage"] as? [String: Any] {
-                                let inT = int64Val(lastUsage["input_tokens"])
-                                let cachedT = int64Val(lastUsage["cached_input_tokens"])
-                                let outT = int64Val(lastUsage["output_tokens"])
-                                let reasonT = int64Val(lastUsage["reasoning_output_tokens"])
-                                let tot = int64Val(lastUsage["total_tokens"])
-                                let stepTokens = max(tot, inT + outT)
-                                if stepTokens > 0 {
-                                    fileTokens += stepTokens
-                                    fileRequests += 1
-                                    fileCost += estimateBlendedCostUSD(
-                                        uncachedInput: max(0, inT - cachedT),
-                                        cachedInput: cachedT,
-                                        cacheWrite: 0,
-                                        output: outT + reasonT
-                                    )
-                                }
-                            } else if let totalUsage = info["total_token_usage"] as? [String: Any] {
-                                let tot = int64Val(totalUsage["total_tokens"])
-                                if tot > lastTotal {
-                                    let delta = tot - lastTotal
-                                    lastTotal = tot
-                                    fileTokens += delta
-                                    fileRequests += 1
-                                    fileCost += Double(delta) / 1_000_000.0 * 1.60
-                                }
-                            }
-                        } else if line.contains("\"role\":\"assistant\"") {
-                            fileRequests += 1
-                        }
-                    }
-
-                    if fileTokens > 0 || fileRequests > 0 {
-                        var b = rolloutByDay[dayKey] ?? AIUsageDailyBucket()
-                        b.tokens += fileTokens
-                        b.cost += fileCost
-                        b.requests += fileRequests
-                        rolloutByDay[dayKey] = b
-                    }
-                }
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension == "jsonl" else { continue }
+            if let modified = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+               modified < cutoffDate {
+                continue
             }
-
-            // Merge rollout details with state_5.sqlite without double counting tokens
-            for (dayKey, rBucket) in rolloutByDay {
-                var existing = byDay[dayKey] ?? AIUsageDailyBucket()
-                existing.tokens = max(existing.tokens, rBucket.tokens)
-                existing.cost = max(existing.cost, rBucket.cost)
-                existing.requests = max(existing.requests, rBucket.requests)
-                byDay[dayKey] = existing
+            guard let text = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
+            let fileBuckets = CodexUsageLogParser.dailyBuckets(in: text, validKeys: validKeys, formatter: formatter)
+            for (day, bucket) in fileBuckets {
+                var existing = byDay[day] ?? AIUsageDailyBucket()
+                existing.tokens += bucket.tokens
+                existing.cost += bucket.cost
+                existing.requests += bucket.requests
+                byDay[day] = existing
             }
         }
 

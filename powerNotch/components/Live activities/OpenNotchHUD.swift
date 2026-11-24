@@ -9,6 +9,7 @@ import SwiftUI
 import Defaults
 
 struct OpenNotchHUD: View {
+    @Environment(\.notchGlassInk) private var ink
     @EnvironmentObject var vm: BoringViewModel
     @Binding var type: SneakContentType
     @Binding var value: CGFloat
@@ -43,7 +44,7 @@ struct OpenNotchHUD: View {
                 }
             }
             .font(.system(size: NotchHeaderMetrics.iconSize, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.92))
+            .foregroundStyle(ink.primary(0.92))
             .frame(width: 18, alignment: .center)
             
             // Slider or Status Text
@@ -55,7 +56,7 @@ struct OpenNotchHUD: View {
             } else {
                 Text(value > 0 ? "Unmuted" : "Muted")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.92))
+                    .foregroundStyle(ink.primary(0.92))
                     .fixedSize()
             }
             
@@ -63,7 +64,7 @@ struct OpenNotchHUD: View {
             if type != .mic && showPercentage {
                 Text("\(Int(value * 100))%")
                     .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.76))
+                    .foregroundStyle(ink.secondary(0.76))
                     .monospacedDigit()
                     .frame(width: 34, alignment: .trailing)
             }

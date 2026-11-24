@@ -181,10 +181,9 @@ struct GeneralSettings: View {
     @Default(.showEmojis) var showEmojis
     @Default(.gestureSensitivity) var gestureSensitivity
     @Default(.minimumHoverDuration) var minimumHoverDuration
-    @Default(.displayNotchVisibility) var displayNotchVisibility
-    @Default(.automaticallySwitchDisplay) var automaticallySwitchDisplay
     @Default(.enableGestures) var enableGestures
     @Default(.openNotchOnHover) var openNotchOnHover
+    @Default(.hapticFeedbackLevel) var hapticFeedbackLevel
     
 
     var body: some View {
@@ -198,70 +197,16 @@ struct GeneralSettings: View {
                 }
                 .tint(.effectiveAccent)
                 LaunchAtLogin.Toggle("Launch at login")
-                Defaults.Toggle(key: .automaticallySwitchDisplay) {
-                    Text("Automatically switch displays")
-                }
-                    .onChange(of: automaticallySwitchDisplay) {
-                        NotificationCenter.default.post(
-                            name: Notification.Name.automaticallySwitchDisplayChanged, object: nil)
-                    }
             } header: {
                 Text("System features")
             }
 
             Section {
-                ForEach(displays) { display in
-                    Toggle(isOn: Binding(
-                        get: {
-                            let _ = displayNotchVisibility
-                            let _ = automaticallySwitchDisplay
-                            return DisplayNotchSettings.isEnabled(forUUID: display.uuid)
-                        },
-                        set: { newValue in
-                            DisplayNotchSettings.setEnabled(newValue, forUUID: display.uuid)
-                        }
-                    )) {
-                        HStack(spacing: 8) {
-                            Image(systemName: display.hasNotch ? "laptopcomputer" : "display")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 18)
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 6) {
-                                    Text(display.name)
-                                    if display.isMain {
-                                        Text("Main")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                            .padding(.horizontal, 5)
-                                            .padding(.vertical, 1)
-                                            .background(
-                                                Capsule().fill(Color.secondary.opacity(0.15))
-                                            )
-                                    }
-                                    if display.hasNotch {
-                                        Text("Notch")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                            .padding(.horizontal, 5)
-                                            .padding(.vertical, 1)
-                                            .background(
-                                                Capsule().fill(Color.secondary.opacity(0.15))
-                                            )
-                                    }
-                                }
-                                Text("\(Int(display.size.width)) × \(Int(display.size.height)) pt")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .monospacedDigit()
-                            }
-                        }
-                    }
-                    .tint(.effectiveAccent)
-                }
+                DisplayModeSettingsRows(displays: displays)
             } header: {
                 Text("Displays")
             } footer: {
-                Text("Independently choose whether the notch is shown on each connected display.")
+                Text("Choose Notch, Dynamic Island, or Off independently for each connected display.")
             }
 
             NotchBehaviour()
@@ -335,8 +280,27 @@ struct GeneralSettings: View {
             Defaults.Toggle(key: .openNotchOnHover) {
                 Text("Open notch on hover")
             }
-            Defaults.Toggle(key: .enableHaptics) {
-                    Text("Enable haptic feedback")
+            Slider(
+                value: Binding(
+                    get: { Double(hapticFeedbackLevel.rawValue) },
+                    set: { newValue in
+                        let newLevel = HapticFeedbackLevel(rawValue: Int(newValue.rounded())) ?? .medium
+                        if newLevel != hapticFeedbackLevel {
+                            hapticFeedbackLevel = newLevel
+                            Defaults[.enableHaptics] = newLevel != .off
+                            newLevel.perform()
+                        }
+                    }
+                ),
+                in: 0...3,
+                step: 1
+            ) {
+                HStack {
+                    Text("Haptic feedback")
+                    Spacer()
+                    Text(hapticFeedbackLevel.title)
+                        .foregroundStyle(.secondary)
+                }
             }
             Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
             if openNotchOnHover {
@@ -860,18 +824,15 @@ private struct DeveloperVersionTapSequence {
 private struct DeveloperSettings: View {
     @Default(.developerOptionsEnabled) private var developerOptionsEnabled
     @Default(.developerAnimationSpeed) private var animationSpeed
-    @Default(.liquidGlassNotch) private var liquidGlassNotch
-    @Default(.developerClearLiquidGlass) private var clearLiquidGlass
     @Default(.displayDynamicIslandTuning) private var displayDynamicIslandTuning
     @Default(.displayNotchVisibility) private var displayNotchVisibility
-    @Default(.automaticallySwitchDisplay) private var automaticallySwitchDisplay
     @Default(.dynamicIslandShape) private var dynamicIslandShape
+    @Default(.displayDynamicIslandShape) private var displayDynamicIslandShape
     @State private var screenRefreshToken = UUID()
 
     private var enabledDisplays: [(info: ConnectedDisplayInfo, defaultHeight: Double)] {
         let _ = screenRefreshToken
         let _ = displayNotchVisibility
-        let _ = automaticallySwitchDisplay
 
         let mainUUID = NSScreen.main?.displayUUID
         return DisplayNotchSettings.enabledScreens().compactMap { screen in
@@ -954,40 +915,18 @@ private struct DeveloperSettings: View {
             }
 
             Section {
-                if !liquidGlassNotch {
+                let anyActiveUsesDynamicIsland = activeDisplays.contains {
+                    DisplayNotchSettings.usesDynamicIsland(
+                        forUUID: $0.info.uuid,
+                        overrides: displayDynamicIslandShape,
+                        defaultEnabled: dynamicIslandShape
+                    )
+                }
+                if !anyActiveUsesDynamicIsland {
                     HStack(spacing: 8) {
                         Image(systemName: "info.circle")
                             .foregroundStyle(.secondary)
-                        Text("Liquid Glass is currently turned off in Appearance settings. Enable it there to preview the glass style.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Glass tint")
-                        Text(clearLiquidGlass ? "Colorless clear glass" : "Dark glass (Default)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button(clearLiquidGlass ? "Switch to dark glass" : "Switch to clear glass") {
-                        clearLiquidGlass.toggle()
-                    }
-                }
-            } header: {
-                Text("Liquid Glass")
-            } footer: {
-                Text("Switch between the default dark tinted Liquid Glass and colorless transparent clear glass.")
-            }
-
-            Section {
-                if !dynamicIslandShape {
-                    HStack(spacing: 8) {
-                        Image(systemName: "info.circle")
-                            .foregroundStyle(.secondary)
-                        Text("Dynamic Island shape is currently turned off in Appearance settings. Values configured here take effect once Dynamic Island is enabled.")
+                        Text("Dynamic Island is currently turned off in General settings. Values configured here take effect once Dynamic Island is selected for a display.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -1003,6 +942,11 @@ private struct DeveloperSettings: View {
                         let defaultHeight = entry.defaultHeight
                         let currentTuning = tuning(for: display.uuid)
                         let effectiveHeight = currentTuning.totalHeight ?? defaultHeight
+                        let isDisplayUsingIsland = DisplayNotchSettings.usesDynamicIsland(
+                            forUUID: display.uuid,
+                            overrides: displayDynamicIslandShape,
+                            defaultEnabled: dynamicIslandShape
+                        )
 
                         let offsetBinding = Binding<Double>(
                             get: { tuning(for: display.uuid).verticalOffset },
@@ -1038,6 +982,18 @@ private struct DeveloperSettings: View {
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 1)
                                     .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                                Text(isDisplayUsingIsland ? "Dynamic Island" : "Notch mode")
+                                    .font(.caption2)
+                                    .foregroundStyle(isDisplayUsingIsland ? Color.effectiveAccent : .secondary)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1)
+                                    .background(
+                                        Capsule().fill(
+                                            isDisplayUsingIsland
+                                                ? Color.effectiveAccent.opacity(0.14)
+                                                : Color.secondary.opacity(0.12)
+                                        )
+                                    )
                                 Spacer()
                                 Button("Reset") {
                                     DisplayNotchSettings.resetTuning(forUUID: display.uuid)
@@ -1194,7 +1150,7 @@ struct About: View {
                 HStack(spacing: 30) {
                     Spacer(minLength: 0)
                     Button {
-                        if let url = URL(string: "https://github.com/TheBoredTeam/powerNotch") {
+                        if let url = URL(string: "https://github.com/Shaun-Z/power.notch") {
                             NSWorkspace.shared.open(url)
                         }
                     } label: {
@@ -1484,10 +1440,14 @@ struct Shelf: View {
 struct Appearance: View {
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Default(.mirrorShape) var mirrorShape
-    @Default(.sliderColor) var sliderColor
+    @Default(.mediaColorStyle) var mediaColorStyle
+    @Default(.customMediaColorData) var customMediaColorData
     @Default(.useMusicVisualizer) var useMusicVisualizer
     @Default(.customVisualizers) var customVisualizers
     @Default(.selectedVisualizer) var selectedVisualizer
+    @Default(.liquidGlassNotch) var liquidGlassNotch
+    @Default(.liquidGlassAppearanceMode) var liquidGlassAppearanceMode
+    @Default(.customGlassColorData) private var customGlassColorData
 
     let icons: [String] = ["logo2"]
     @State private var selectedIcon: String = "logo2"
@@ -1509,35 +1469,91 @@ struct Appearance: View {
             }
 
             Section {
-                Defaults.Toggle(key: .liquidGlassNotch) {
-                    Text("Liquid Glass expanded notch")
-                }
-                LiquidGlassOpacitySetting()
-                Defaults.Toggle(key: .dynamicIslandShape) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Dynamic Island expanded shape")
-                        Text("Morph expanded wings and card into a rounded Dynamic Island contour matching inner corners")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                Toggle(
+                    "Use Liquid Glass",
+                    isOn: Binding(
+                        get: { liquidGlassNotch },
+                        set: { newValue in
+                            liquidGlassNotch = newValue
+                            LiquidGlassAppearance.syncResolvedAppearance(
+                                isEnabled: newValue,
+                                mode: liquidGlassAppearanceMode
+                            )
+                        }
+                    )
+                )
+                HStack {
+                    Picker(
+                        "Color",
+                        selection: Binding(
+                            get: { liquidGlassAppearanceMode },
+                            set: { newValue in
+                                liquidGlassAppearanceMode = newValue
+                                LiquidGlassAppearance.syncResolvedAppearance(
+                                    isEnabled: liquidGlassNotch,
+                                    mode: newValue
+                                )
+                            }
+                        )
+                    ) {
+                        ForEach(LiquidGlassAppearanceMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    if liquidGlassAppearanceMode == .custom {
+                        ColorPicker(
+                            "Custom glass color",
+                            selection: Binding(
+                                get: { Color(nsColor: LiquidGlassAppearance.customColor(from: customGlassColorData)) },
+                                set: { newColor in
+                                    customGlassColorData = LiquidGlassAppearance.archiveCustomColor(newColor)
+                                    LiquidGlassAppearance.syncResolvedAppearance()
+                                }
+                            ),
+                            supportsOpacity: false
+                        )
+                        .labelsHidden()
                     }
                 }
+                .disabled(!liquidGlassNotch)
+                LiquidGlassOpacitySetting()
             } header: {
-                Text("Liquid Glass & Dynamic Island")
+                Text("Liquid Glass")
             }
 
             Section {
-                Defaults.Toggle(key: .coloredSpectrogram) {
-                    Text("Colored spectrogram")
-                }
-                Defaults
-                    .Toggle("Player tinting", key: .playerColorTinting)
-                Defaults.Toggle(key: .lightingEffect) {
-                    Text("Enable blur effect behind album art")
-                }
-                Picker("Slider color", selection: $sliderColor) {
-                    ForEach(SliderColorEnum.allCases, id: \.self) { option in
-                        Text(option.rawValue)
+                Picker(
+                    "Media color",
+                    selection: Binding(
+                        get: { mediaColorStyle },
+                        set: { newValue in
+                            mediaColorStyle = newValue
+                            if newValue == .albumArt {
+                                MusicManager.shared.calculateAverageColor()
+                            }
+                        }
+                    )
+                ) {
+                    ForEach(MediaColorStyle.allCases) { style in
+                        Text(style.title).tag(style)
                     }
+                }
+                .pickerStyle(.menu)
+
+                if mediaColorStyle == .custom {
+                    ColorPicker(
+                        "Custom color",
+                        selection: Binding(
+                            get: {
+                                Color(nsColor: MediaColorStyle.resolvedCustomNSColor(from: customMediaColorData))
+                            },
+                            set: { newColor in
+                                customMediaColorData = MediaColorStyle.archiveCustomColor(newColor)
+                            }
+                        ),
+                        supportsOpacity: false
+                    )
                 }
             } header: {
                 Text("Media")
@@ -1754,10 +1770,28 @@ private struct LiquidGlassOpacitySetting: View {
     @Default(.liquidGlassNotch) private var liquidGlassNotch
     @Default(.liquidGlassOpacity) private var liquidGlassOpacity
 
+    private static let transparentSymbolName = firstAvailableSymbol([
+        "capsule.on.rectangle.liquid.glass",
+        "capsule.on.rectangle",
+        "square.on.square",
+    ])
+
+    private static let opaqueSymbolName = firstAvailableSymbol([
+        "capsule.on.rectangle.fill",
+        "square.fill.on.square.fill",
+    ])
+
+    private static func firstAvailableSymbol(_ candidates: [String]) -> String {
+        for name in candidates where NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil {
+            return name
+        }
+        return candidates.last ?? "square.on.square"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Glass opacity")
+                Text("Opacity")
                 Spacer()
                 Text(liquidGlassOpacity, format: .percent.precision(.fractionLength(0)))
                     .monospacedDigit()
@@ -1771,23 +1805,201 @@ private struct LiquidGlassOpacitySetting: View {
                 ),
                 in: 0...1
             ) {
-                Text("Glass opacity")
+                Text("Opacity")
             } minimumValueLabel: {
-                Image(systemName: "square.on.square")
+                Image(systemName: Self.transparentSymbolName)
+                    .symbolVariant(.none)
                     .accessibilityLabel("More transparent")
                     .help("More transparent")
             } maximumValueLabel: {
-                Image(systemName: "square.on.square.fill")
+                Image(systemName: Self.opaqueSymbolName)
+                    .symbolVariant(.none)
                     .accessibilityLabel("More opaque")
                     .help("More opaque")
             }
             .labelsHidden()
-            .environment(\.symbolVariants, .none)
             .tint(.gray)
             .accessibilityValue(Text(liquidGlassOpacity, format: .percent.precision(.fractionLength(0))))
             .accessibilityIdentifier("liquidGlassOpacitySlider")
         }
         .disabled(!liquidGlassNotch)
+    }
+}
+
+private enum DisplayNotchModeOption: Hashable {
+    case notch
+    case dynamicIsland
+    case off
+}
+
+private struct DisplayModeSettingsRows: View {
+    let displays: [ConnectedDisplayInfo]
+
+    @Default(.displayNotchVisibility) private var displayNotchVisibility
+    @Default(.dynamicIslandShape) private var dynamicIslandShape
+    @Default(.displayDynamicIslandShape) private var displayDynamicIslandShape
+
+    private func mode(for display: ConnectedDisplayInfo) -> DisplayNotchModeOption {
+        let _ = displayNotchVisibility
+        guard DisplayNotchSettings.isEnabled(forUUID: display.uuid) else {
+            return .off
+        }
+        return DisplayNotchSettings.usesDynamicIsland(
+            forUUID: display.uuid,
+            overrides: displayDynamicIslandShape,
+            defaultEnabled: dynamicIslandShape
+        ) ? .dynamicIsland : .notch
+    }
+
+    private var allNotch: Bool {
+        !displays.isEmpty && displays.allSatisfy { mode(for: $0) == .notch }
+    }
+
+    private var allDynamicIsland: Bool {
+        !displays.isEmpty && displays.allSatisfy { mode(for: $0) == .dynamicIsland }
+    }
+
+    private var allOff: Bool {
+        !displays.isEmpty && displays.allSatisfy { mode(for: $0) == .off }
+    }
+
+    private var summarySubtitle: String {
+        if allDynamicIsland {
+            return "All Dynamic Island"
+        }
+        if allNotch {
+            return "All Notch"
+        }
+        if allOff {
+            return "All Off"
+        }
+        return "Custom per display"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("All displays")
+                Spacer()
+                Text(summarySubtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 6) {
+                applyAllButton(title: "All Notch", isActive: allNotch) {
+                    DisplayNotchSettings.setUsesDynamicIslandForAllDisplays(false)
+                }
+                applyAllButton(title: "All Dynamic Island", isActive: allDynamicIsland) {
+                    DisplayNotchSettings.setUsesDynamicIslandForAllDisplays(true)
+                }
+                applyAllButton(title: "All Off", isActive: allOff) {
+                    DisplayNotchSettings.setAllDisplaysEnabled(false)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+
+        ForEach(displays) { display in
+            let modeBinding = Binding<DisplayNotchModeOption>(
+                get: { mode(for: display) },
+                set: { newMode in
+                    switch newMode {
+                    case .notch:
+                        DisplayNotchSettings.setUsesDynamicIsland(false, forUUID: display.uuid)
+                        if !DisplayNotchSettings.isEnabled(forUUID: display.uuid) {
+                            DisplayNotchSettings.setEnabled(true, forUUID: display.uuid)
+                        }
+                    case .dynamicIsland:
+                        DisplayNotchSettings.setUsesDynamicIsland(true, forUUID: display.uuid)
+                        if !DisplayNotchSettings.isEnabled(forUUID: display.uuid) {
+                            DisplayNotchSettings.setEnabled(true, forUUID: display.uuid)
+                        }
+                    case .off:
+                        DisplayNotchSettings.setEnabled(false, forUUID: display.uuid)
+                    }
+                }
+            )
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: display.hasNotch ? "laptopcomputer" : "display")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16)
+
+                    Text(display.name)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .layoutPriority(1)
+
+                    if display.isMain {
+                        Text("Main")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(
+                                Capsule().fill(Color.secondary.opacity(0.15))
+                            )
+                            .fixedSize()
+                    }
+                    if display.hasNotch {
+                        Text("Notch")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(
+                                Capsule().fill(Color.secondary.opacity(0.15))
+                            )
+                            .fixedSize()
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Text("\(Int(display.size.width)) × \(Int(display.size.height)) pt")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .fixedSize()
+                }
+
+                Picker("", selection: modeBinding) {
+                    Text("Notch").tag(DisplayNotchModeOption.notch)
+                    Text("Dynamic Island").tag(DisplayNotchModeOption.dynamicIsland)
+                    Text("Off").tag(DisplayNotchModeOption.off)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    @ViewBuilder
+    private func applyAllButton(
+        title: String,
+        isActive: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        if isActive {
+            Button(action: action) {
+                Text(title)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.effectiveAccent)
+            .controlSize(.small)
+        } else {
+            Button(action: action) {
+                Text(title)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
     }
 }
 
@@ -2188,11 +2400,15 @@ func warningBadge(_ text: String, _ description: String) -> some View {
 
 #Preview("Liquid Glass appearance") {
     Form {
-        Defaults.Toggle(key: .liquidGlassNotch) {
-            Text("Liquid Glass expanded notch")
+        Toggle("Use Liquid Glass", isOn: .constant(true))
+        Picker("Color", selection: .constant(LiquidGlassAppearanceMode.dark)) {
+            ForEach(LiquidGlassAppearanceMode.allCases) { mode in
+                Text(mode.title).tag(mode)
+            }
         }
+        .pickerStyle(.menu)
         LiquidGlassOpacitySetting()
     }
     .formStyle(.grouped)
-    .frame(width: 460, height: 170)
+    .frame(width: 460, height: 210)
 }
