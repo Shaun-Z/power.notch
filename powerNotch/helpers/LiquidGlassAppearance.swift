@@ -165,6 +165,9 @@ enum LiquidGlassAppearance {
         }
 
         if styleTask == nil {
+            // Persist the initial choice before updating the legacy derived light/dark flag.
+            // Otherwise a fresh Follow System default could become Light on the next launch.
+            Defaults[.liquidGlassAppearanceMode] = Defaults[.liquidGlassAppearanceMode]
             syncResolvedAppearance()
             styleTask = Task {
                 for await _ in Defaults.updates([.liquidGlassNotch, .liquidGlassAppearanceMode, .customGlassColorData]) {
