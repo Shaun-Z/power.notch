@@ -3,26 +3,28 @@
     <channel>
         <title>powerNotch</title>
         <item>
-            <title>0.1.0</title>
-            <pubDate>Wed, 25 Nov 2026 08:30:34 +0000</pubDate>
+            <title>0.1.1</title>
+            <pubDate>Wed, 25 Nov 2026 11:26:18 +0000</pubDate>
             <link>https://github.com/Shaun-Z/power.notch/releases</link>
-            <sparkle:version>272</sparkle:version>
-            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:version>273</sparkle:version>
+            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[First public release of powerNotch, an independent fork of boringNotch.
+            <description><![CDATA[Desktop widgets can now read AI usage snapshots in ad-hoc builds without requiring a paid Apple Developer account or a provisioned App Group.
 
-- Music playback controls, artwork and synchronized lyrics in the notch or Dynamic Island.
-- Experimental native NetEase Cloud Music support.
-- Per-display Notch / Dynamic Island modes and configurable Liquid Glass appearance.
-- Optional AI quota, balance and usage-history monitoring.
-- Calendar, reminders, file shelf, system HUDs and webcam tools inherited from boringNotch.
+- Keep App Group storage as the first choice for configured team builds; fall back to an owner-only Application Support directory for ad-hoc builds.
+- Grant the sandboxed widget read-only access to that snapshot directory. API keys and OAuth tokens are never written to the widget snapshot.
+- Save provider-page and 30-day chart-metric selections in widget-local preferences without an App Group.
+- Keep the last snapshot available after the app quits. Refreshing provider data requires the app to be running.
+- Set the app and extension marketing version to 0.1.1 and document the fallback.
 
-Requires macOS 15 Sequoia or later; native Liquid Glass requires macOS 26 or later. The DMG supports Apple Silicon and Intel Macs.
+Validation: Xcode build; 98 Swift tests; 48 release-script tests; universal arm64/x86_64 archive and ad-hoc signature verification. On macOS 27.2.1, the installed extension generated medium and large timelines. A separate sandboxed probe using production code verified real snapshot reads, denied writes, paging and metric persistence across processes, refresh notification delivery, and reads after the app quit.
 
-The app is not notarized by Apple. After installing it in Applications and trying to launch it, you may need to allow it in System Settings → Privacy & Security → Open Anyway. Desktop widget data sharing is unavailable in this ad-hoc build; AI usage inside the app remains available.
+Desktop visual rendering and button delivery through chronod remain unverified because the test session lacked Accessibility and screen capture access. The sandboxed probe checks do not replace those UI checks. Compatibility and upgrade behavior may vary by macOS version.
 
-Full credit to TheBoredTeam and boringNotch contributors, and the other projects acknowledged in the README and third-party notices.]]></description>
-            <enclosure url="https://github.com/Shaun-Z/power.notch/releases/download/v0.1.0/powerNotch.dmg" length="13200128" type="application/octet-stream" sparkle:edSignature="QMaerZR45Rt7iTICj+9ho1L0azvLojIzABYHZ0yjsa5Xr5pYtwRqeKpUpLFz2m43+Qr1O1YcvnFO87eBDv+IDg=="/>
+The app is not notarized by Apple. After installing in Applications and trying to launch it, macOS may require System Settings → Privacy & Security → Open Anyway.
+
+Thanks to TheBoredTeam and boringNotch contributors for the original app and architecture, and to lyrimuse, lycrics_notch, MediaRemoteAdapter, and the other projects credited in the README and THIRD_PARTY_LICENSES.]]></description>
+            <enclosure url="https://github.com/Shaun-Z/power.notch/releases/download/v0.1.1/powerNotch.dmg" length="13201987" type="application/octet-stream" sparkle:edSignature="LcBCHqvHiWCFJURk6XDwmpvQjSfZgIoBj0Wnr1+XCPad9g1Z5yqcVQdIQrSEYJjrZ7Nq4N6ptxM6oAZD+968CA=="/>
         </item>
     </channel>
 </rss>
