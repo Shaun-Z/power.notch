@@ -84,10 +84,23 @@ jobs:
             echo "is_beta=$IS_BETA"
           } >> "$GITHUB_OUTPUT"
 
+      # Draft metadata requires push access. Keep GITHUB_TOKEN read-only;
+      # use the existing release App's short-lived, repository-scoped token
+      # only for draft lookups, after the main-ref and admin checks above.
+      - name: Create release metadata token
+        id: release_metadata_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+
       - name: Determine release state
         id: release_state
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_METADATA_TOKEN: ${{ steps.release_metadata_token.outputs.token }}
           REPO: ${{ github.repository }}
           VERSION: ${{ steps.extract_version.outputs.version }}
         run: |
@@ -101,7 +114,7 @@ jobs:
           # Draft releases are invisible to the /releases/tags REST endpoint
           # (it 404s for drafts even with write access), so the probe goes
           # through gh release view, which resolves drafts via the list API.
-          if RELEASE_JSON="$(gh release view "$TAG" --repo "$REPO" --json isDraft,targetCommitish 2>"$LOOKUP_ERROR")"; then
+          if RELEASE_JSON="$(GH_TOKEN="$RELEASE_METADATA_TOKEN" gh release view "$TAG" --repo "$REPO" --json isDraft,targetCommitish 2>"$LOOKUP_ERROR")"; then
             IS_DRAFT="$(jq -r '.isDraft' <<< "$RELEASE_JSON")"
             if [[ "$IS_DRAFT" != "true" ]]; then
               echo "::error::Version v${VERSION} is already published"
@@ -207,6 +220,7 @@ jobs:
         id: release_notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_METADATA_TOKEN: ${{ steps.release_metadata_token.outputs.token }}
           PR_NUMBER: ${{ steps.release_state.outputs.pr_number }}
           VERSION: ${{ steps.extract_version.outputs.version }}
           REPO: ${{ github.repository }}
@@ -218,8 +232,8 @@ jobs:
           else
             # The resume path must read a draft release, which the
             # /releases/tags endpoint cannot see; gh release view can.
-            TITLE=$(gh release view "v${VERSION}" --repo "$REPO" --json name --jq '.name // "Release"')
-            BODY=$(gh release view "v${VERSION}" --repo "$REPO" --json body --jq '.body // "- No release notes provided"')
+            TITLE=$(GH_TOKEN="$RELEASE_METADATA_TOKEN" gh release view "v${VERSION}" --repo "$REPO" --json name --jq '.name // "Release"')
+            BODY=$(GH_TOKEN="$RELEASE_METADATA_TOKEN" gh release view "v${VERSION}" --repo "$REPO" --json body --jq '.body // "- No release notes provided"')
           fi
 
           BODY_GITHUB=$(printf '%s' "$BODY" | sed '/^# /d' | perl -pe 's#<h1[^>]*>.*?</h1>##gi')

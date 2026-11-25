@@ -73,6 +73,7 @@ class WorkflowSmokeTests(unittest.TestCase):
                 env={
                     **os.environ,
                     "MOCK_RESPONSE": response,
+                    "RELEASE_METADATA_TOKEN": "test-metadata-token",
                     "REPO": "Shaun-Z/power.notch",
                     "VERSION": "0.1.0",
                     "RUNNER_TEMP": directory,
@@ -492,6 +493,10 @@ class WorkflowSmokeTests(unittest.TestCase):
     def test_release_resume_reads_the_draft_target_commitish(self) -> None:
         # Resuming from a draft must recover its source commit; the
         # list-backed gh release view exposes it as targetCommitish.
+        preparation = self.release.split("  preparation:", 1)[1].split("  build:", 1)[0]
+        self.assertNotIn("      contents: write", preparation)
+        self.assertLess(preparation.index("- name: Authorize release"), preparation.index("- name: Create release metadata token"))
+        self.assertIn('GH_TOKEN="$RELEASE_METADATA_TOKEN" gh release view "$TAG"', preparation)
         self.assertIn('gh release view "$TAG" --repo "$REPO" --json isDraft,targetCommitish', self.release)
         self.assertIn("jq -r '.isDraft'", self.release)
         self.assertIn("jq -r '.targetCommitish'", self.release)
@@ -501,6 +506,7 @@ class WorkflowSmokeTests(unittest.TestCase):
         # Resume regenerates release notes from the existing draft; probing
         # it must work while the release is still a draft.
         resume_block = self.release.split("Generate release notes", 1)[1].split("- name:", 1)[0]
+        self.assertIn('GH_TOKEN="$RELEASE_METADATA_TOKEN" gh release view "v${VERSION}"', resume_block)
         self.assertIn('gh release view "v${VERSION}" --repo "$REPO" --json name', resume_block)
         self.assertIn('gh release view "v${VERSION}" --repo "$REPO" --json body', resume_block)
 
