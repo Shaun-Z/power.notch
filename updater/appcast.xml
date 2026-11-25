@@ -1,9 +1,28 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" standalone="yes"?>
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
-        <title>powerNotch Updates</title>
-        <link>https://github.com/Shaun-Z/power.notch/releases</link>
-        <description>Stable and beta releases of powerNotch.</description>
-        <language>en</language>
+        <title>powerNotch</title>
+        <item>
+            <title>0.1.0</title>
+            <pubDate>Wed, 25 Nov 2026 08:30:34 +0000</pubDate>
+            <link>https://github.com/Shaun-Z/power.notch/releases</link>
+            <sparkle:version>272</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[First public release of powerNotch, an independent fork of boringNotch.
+
+- Music playback controls, artwork and synchronized lyrics in the notch or Dynamic Island.
+- Experimental native NetEase Cloud Music support.
+- Per-display Notch / Dynamic Island modes and configurable Liquid Glass appearance.
+- Optional AI quota, balance and usage-history monitoring.
+- Calendar, reminders, file shelf, system HUDs and webcam tools inherited from boringNotch.
+
+Requires macOS 15 Sequoia or later; native Liquid Glass requires macOS 26 or later. The DMG supports Apple Silicon and Intel Macs.
+
+The app is not notarized by Apple. After installing it in Applications and trying to launch it, you may need to allow it in System Settings → Privacy & Security → Open Anyway. Desktop widget data sharing is unavailable in this ad-hoc build; AI usage inside the app remains available.
+
+Full credit to TheBoredTeam and boringNotch contributors, and the other projects acknowledged in the README and third-party notices.]]></description>
+            <enclosure url="https://github.com/Shaun-Z/power.notch/releases/download/v0.1.0/powerNotch.dmg" length="13200128" type="application/octet-stream" sparkle:edSignature="QMaerZR45Rt7iTICj+9ho1L0azvLojIzABYHZ0yjsa5Xr5pYtwRqeKpUpLFz2m43+Qr1O1YcvnFO87eBDv+IDg=="/>
+        </item>
     </channel>
 </rss>
