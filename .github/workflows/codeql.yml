@@ -13,11 +13,18 @@ name: "CodeQL Advanced"
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    # Development changes are scanned by their PR; avoid scanning dev twice.
+    branches: [ "main" ]
   pull_request:
     branches: [ "main", "dev" ]
   schedule:
     - cron: '31 15 * * 1'
+
+concurrency:
+  # Replace outdated runs of the same PR/branch, while keeping scheduled scans
+  # independent from push scans and separate PRs independent from one another.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
