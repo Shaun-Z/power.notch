@@ -2,7 +2,7 @@
 //  AIUsageWidgetModels.swift
 //  PowerNotchWidgets
 //
-//  Shared data contract & App Group persistence for PowerNotch AI Usage desktop widgets.
+//  Shared data contract and App Group / widget-local persistence for desktop widgets.
 //
 
 import AppKit
@@ -72,15 +72,12 @@ enum AIUsageWidgetStore {
     private static let chartMetricKey = "aiUsageWidget.large.selectedChartMetric"
 
     private static func payloadFileURL() -> URL? {
-        guard AIUsageWidgetSharedConstants.hasTeamPrefixedAppGroup() else { return nil }
-        return FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: AIUsageWidgetConstants.appGroupID)?
-            .appendingPathComponent(AIUsageWidgetConstants.payloadFileName, isDirectory: false)
+        AIUsageWidgetSharedConstants.payloadFileURL()
     }
 
-    private static var defaults: UserDefaults? {
-        guard AIUsageWidgetSharedConstants.hasTeamPrefixedAppGroup() else { return nil }
-        return UserDefaults(suiteName: AIUsageWidgetConstants.appGroupID)
+    private static var defaults: UserDefaults {
+        guard AIUsageWidgetSharedConstants.hasTeamPrefixedAppGroup() else { return .standard }
+        return UserDefaults(suiteName: AIUsageWidgetConstants.appGroupID) ?? .standard
     }
 
     private static func pageKey(for familyKey: String) -> String {
@@ -97,22 +94,22 @@ enum AIUsageWidgetStore {
     }
 
     static func selectedProviderID(for familyKey: String) -> String? {
-        defaults?.string(forKey: pageKey(for: familyKey))
+        defaults.string(forKey: pageKey(for: familyKey))
     }
 
     static func setSelectedProviderID(_ id: String, for familyKey: String) {
-        defaults?.set(id, forKey: pageKey(for: familyKey))
+        defaults.set(id, forKey: pageKey(for: familyKey))
     }
 
     static func selectedChartMetric() -> AIUsageChartMetric {
-        guard let raw = defaults?.string(forKey: chartMetricKey),
+        guard let raw = defaults.string(forKey: chartMetricKey),
               let metric = AIUsageChartMetric(rawValue: raw)
         else { return .tokens }
         return metric
     }
 
     static func setSelectedChartMetric(_ metric: AIUsageChartMetric) {
-        defaults?.set(metric.rawValue, forKey: chartMetricKey)
+        defaults.set(metric.rawValue, forKey: chartMetricKey)
     }
 
     static func resolvePage(

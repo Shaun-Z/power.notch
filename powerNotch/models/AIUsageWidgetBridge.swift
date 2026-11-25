@@ -2,7 +2,7 @@
 //  AIUsageWidgetBridge.swift
 //  powerNotch
 //
-//  Shared App Group snapshot writer & notification bridge between PowerNotch and PowerNotchWidgetsExtension.
+//  App Group / read-only file snapshot writer and widget notification bridge.
 //
 
 import AppKit
@@ -14,10 +14,7 @@ typealias AIUsageWidgetBridgeConstants = AIUsageWidgetSharedConstants
 
 enum AIUsageWidgetSync {
     private static func containerFileURL() -> URL? {
-        guard AIUsageWidgetSharedConstants.hasTeamPrefixedAppGroup() else { return nil }
-        return FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: AIUsageWidgetBridgeConstants.appGroupID)?
-            .appendingPathComponent(AIUsageWidgetBridgeConstants.payloadFileName, isDirectory: false)
+        AIUsageWidgetSharedConstants.payloadFileURL()
     }
 
     static func sync(
@@ -118,6 +115,11 @@ enum AIUsageWidgetSync {
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             let data = try encoder.encode(payload)
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
             try data.write(to: fileURL, options: .atomic)
         } catch {
             // Non-fatal: widget will keep last good snapshot if container write fails

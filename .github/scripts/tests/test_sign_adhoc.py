@@ -27,10 +27,26 @@ class AdHocSigningTests(unittest.TestCase):
         source.update({
             "com.apple.security.app-sandbox": True,
             "com.apple.security.network.client": True,
+            "com.apple.security.temporary-exception.files.home-relative-path.read-only": [
+                "/Library/Application Support/powerNotch/widget/"
+            ],
         })
         self.assertEqual(signing.release_entitlements(source), {
             "com.apple.security.app-sandbox": True,
             "com.apple.security.network.client": True,
+            "com.apple.security.temporary-exception.files.home-relative-path.read-only": [
+                "/Library/Application Support/powerNotch/widget/"
+            ],
+        })
+
+    def test_widget_source_entitlements_keep_only_the_narrow_snapshot_exception(self):
+        source = signing.read_plist(signing.OWN_ENTITLEMENTS["com.powernotch.app.PowerNotchWidgets"])
+        result = signing.release_entitlements(source)
+        self.assertEqual(result, {
+            "com.apple.security.app-sandbox": True,
+            "com.apple.security.temporary-exception.files.home-relative-path.read-only": [
+                "/Library/Application Support/powerNotch/widget/"
+            ],
         })
 
     @unittest.skipUnless(sys.platform == "darwin", "Requires macOS codesign and clang")
@@ -104,7 +120,12 @@ class AdHocSigningTests(unittest.TestCase):
             own_permissions = {
                 "com.powernotch.app": {"com.apple.security.device.camera": True},
                 "com.powernotch.app.PowerNotchXPCHelper": {"com.apple.security.app-sandbox": False},
-                "com.powernotch.app.PowerNotchWidgets": {"com.apple.security.app-sandbox": True},
+                "com.powernotch.app.PowerNotchWidgets": {
+                    "com.apple.security.app-sandbox": True,
+                    "com.apple.security.temporary-exception.files.home-relative-path.read-only": [
+                        "/Library/Application Support/powerNotch/widget/"
+                    ],
+                },
             }
             fixtures = {}
             for index, (identifier, permissions) in enumerate(own_permissions.items()):
@@ -125,6 +146,12 @@ class AdHocSigningTests(unittest.TestCase):
                 self.assertNotIn("com.apple.security.application-groups", signing.existing_entitlements(bundle))
             self.assertTrue(signing.existing_entitlements(app)["com.apple.security.device.camera"])
             self.assertTrue(signing.existing_entitlements(widget)["com.apple.security.app-sandbox"])
+            self.assertEqual(
+                signing.existing_entitlements(widget)[
+                    "com.apple.security.temporary-exception.files.home-relative-path.read-only"
+                ],
+                ["/Library/Application Support/powerNotch/widget/"],
+            )
             self.assertTrue(signing.existing_entitlements(vendor_helper)["com.apple.security.network.client"])
 
             resource.write_text("modified after signing")
