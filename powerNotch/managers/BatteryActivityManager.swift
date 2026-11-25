@@ -3,6 +3,7 @@ import IOKit.ps
 
 /// Manages and monitors battery status changes on the device
 /// - Note: This class uses the IOKit framework to monitor battery status
+@MainActor
 class BatteryActivityManager {
 
     static let shared = BatteryActivityManager()
@@ -15,7 +16,8 @@ class BatteryActivityManager {
     var onTimeToFullChargeChange: ((Int) -> Void)?
 
     private var batterySource: CFRunLoopSource?
-    private var observers: [(BatteryEvent) -> Void] = []
+    private var observers: [Int: (BatteryEvent) -> Void] = [:]
+    private var nextObserverID = 0
     private var previousBatteryInfo: BatteryInfo?
     private var notificationQueue: [BatteryEvent] = []
     private var isProcessingNotifications = false
@@ -61,8 +63,8 @@ class BatteryActivityManager {
     }
 
     /// Called when low power mode is enabled or disabled
-    @objc private func lowPowerModeChanged() {
-        notifyBatteryChanges()
+    @objc nonisolated private func lowPowerModeChanged() {
+        Task { @MainActor [weak self] in self?.notifyBatteryChanges() }
     }
     
     /// Starts monitoring battery changes
@@ -70,18 +72,18 @@ class BatteryActivityManager {
         guard let powerSource = IOPSNotificationCreateRunLoopSource({ context in
             guard let context = context else { return }
             let manager = Unmanaged<BatteryActivityManager>.fromOpaque(context).takeUnretainedValue()
-            manager.notifyBatteryChanges()
+            MainActor.assumeIsolated { manager.notifyBatteryChanges() }
         }, Unmanaged.passUnretained(self).toOpaque())?.takeRetainedValue() else {
             return
         }
         batterySource = powerSource
-        CFRunLoopAddSource(CFRunLoopGetCurrent(), powerSource, .defaultMode)
+        CFRunLoopAddSource(CFRunLoopGetMain(), powerSource, .defaultMode)
     }
 
     /// Stops monitoring battery changes
     private func stopMonitoring() {
         if let powerSource = batterySource {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), powerSource, .defaultMode)
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), powerSource, .defaultMode)
             batterySource = nil
         }
     }
@@ -282,15 +284,16 @@ class BatteryActivityManager {
     /// - Parameter observer: The observer closure to be called on battery events
     /// - Returns: The ID of the observer for later removal
     func addObserver(_ observer: @escaping (BatteryEvent) -> Void) -> Int {
-        observers.append(observer)
-        return observers.count - 1
+        let id = nextObserverID
+        nextObserverID += 1
+        observers[id] = observer
+        return id
     }
 
     /// Removes an observer by its ID
     /// - Parameter id: The ID of the observer to be removed
     func removeObserver(byId id: Int) {
-        guard id >= 0 && id < observers.count else { return }
-        observers.remove(at: id)
+        observers.removeValue(forKey: id)
     }
     
     /// Notifies all observers of a battery event
@@ -298,14 +301,14 @@ class BatteryActivityManager {
     private func notifyObservers(event: BatteryEvent) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            for observer in self.observers {
+            for observer in Array(self.observers.values) {
                 observer(event)
             }
         }
     }
     
     deinit {
-        stopMonitoring()
+        if let batterySource { CFRunLoopRemoveSource(CFRunLoopGetMain(), batterySource, .defaultMode) }
         NotificationCenter.default.removeObserver(self)
     }
     

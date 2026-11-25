@@ -64,11 +64,10 @@ class CalendarManager: ObservableObject {
     }
 
     func checkCalendarAuthorization() async {
+        guard let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate) else { return }
         let status = EKEventStore.authorizationStatus(for: .event)
-        DispatchQueue.main.async {
-            print("📅 Current calendar authorization status: \(status)")
-            self.calendarAuthorizationStatus = status
-        }
+        print("📅 Current calendar authorization status: \(status)")
+        self.calendarAuthorizationStatus = status
 
         switch status {
         case .notDetermined:
@@ -81,7 +80,7 @@ class CalendarManager: ObservableObject {
                 await reloadCalendarAndReminderLists()
                 events = await calendarService.events(
                     from: currentWeekStartDate,
-                    to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
+                    to: dayEnd,
                     calendars: selectedCalendars.map { $0.id })
             }
         case .restricted, .denied:
@@ -91,7 +90,7 @@ class CalendarManager: ObservableObject {
             await reloadCalendarAndReminderLists()
             events = await calendarService.events(
                 from: currentWeekStartDate,
-                to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
+                to: dayEnd,
                 calendars: selectedCalendars.map { $0.id })
         case .writeOnly:
             NSLog("Write only")
@@ -102,10 +101,8 @@ class CalendarManager: ObservableObject {
     
     func checkReminderAuthorization() async {
         let status = EKEventStore.authorizationStatus(for: .reminder)
-        DispatchQueue.main.async {
-            print("📅 Current reminder authorization status: \(status)")
-            self.reminderAuthorizationStatus = status
-        }
+        print("📅 Current reminder authorization status: \(status)")
+        self.reminderAuthorizationStatus = status
 
         switch status {
         case .notDetermined:
@@ -184,21 +181,23 @@ class CalendarManager: ObservableObject {
     }
 
     private func updateEvents() async {
+        guard let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate) else { return }
         let calendarIDs = selectedCalendars.map { $0.id }
         let eventsResult = await calendarService.events(
             from: currentWeekStartDate,
-            to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
+            to: dayEnd,
             calendars: calendarIDs
         )
         self.events = eventsResult
     }
     
     func setReminderCompleted(reminderID: String, completed: Bool) async {
+        guard let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate) else { return }
         await calendarService.setReminderCompleted(reminderID: reminderID, completed: completed)
         // Refresh events after updating
         events = await calendarService.events(
             from: currentWeekStartDate,
-            to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
+            to: dayEnd,
             calendars: selectedCalendars.map { $0.id })
     }
 }

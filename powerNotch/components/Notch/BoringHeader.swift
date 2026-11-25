@@ -164,6 +164,7 @@ struct BoringHeader: View {
     @Default(.enableAIUsageNotchTab) var enableAIUsageNotchTab
 
     private var shouldShowTabPicker: Bool {
+        guard !coordinator.isScreenLocked else { return false }
         let shelfVisible = (!tvm.isEmpty || coordinator.alwaysShowTabs) && boringShelf
         return shelfVisible || enableAIUsageNotchTab
     }
@@ -201,7 +202,7 @@ struct BoringHeader: View {
                             OpenNotchHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon)
                                 .transition(.scale(scale: 0.88).combined(with: .opacity))
                         } else {
-                            if Defaults[.showMirror] {
+                            if Defaults[.showMirror] && !coordinator.isScreenLocked {
                                 NotchHeaderIconButton(
                                     systemName: "web.camera.fill",
                                     isActive: vm.isCameraExpanded,
@@ -210,7 +211,7 @@ struct BoringHeader: View {
                                     vm.toggleCameraPreview()
                                 }
                             }
-                            if Defaults[.settingsIconInNotch] {
+                            if Defaults[.settingsIconInNotch] && !coordinator.isScreenLocked {
                                 NotchHeaderIconButton(
                                     systemName: "gearshape.fill",
                                     isActive: false,

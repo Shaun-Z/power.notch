@@ -14,30 +14,7 @@ import SQLite3
 import zlib
 
 class PowerNotchXPCHelper: NSObject, PowerNotchXPCHelperProtocol {
-    
-    @objc func isAccessibilityAuthorized(with reply: @escaping (Bool) -> Void) {
-        reply(AXIsProcessTrusted())
-    }
 
-    @objc func requestAccessibilityAuthorization() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        AXIsProcessTrustedWithOptions(options)
-    }
-
-    @objc func ensureAccessibilityAuthorization(_ promptIfNeeded: Bool, with reply: @escaping (Bool) -> Void) {
-        if AXIsProcessTrusted() {
-            reply(true)
-            return
-        }
-
-        if promptIfNeeded {
-            requestAccessibilityAuthorization()
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            reply(AXIsProcessTrusted())
-        }
-    }
     
     private class KeyboardBrightnessClient {
         private static let keyboardID: UInt64 = 1
@@ -158,17 +135,31 @@ class PowerNotchXPCHelper: NSObject, PowerNotchXPCHelperProtocol {
     }
 
     private static func ensureNoBrowserShimDirectory() -> String? {
-        let dirURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .appendingPathComponent("powernotch-nobrowser", isDirectory: true)
+        let parent = URL(fileURLWithPath: resolvedUserHomePath(), isDirectory: true)
+            .appendingPathComponent("Library/Caches/com.powernotch.app.PowerNotchXPCHelper", isDirectory: true)
+        let dirURL = parent.appendingPathComponent("nobrowser-\(getpid())", isDirectory: true)
         let openShimURL = dirURL.appendingPathComponent("open", isDirectory: false)
-        let fm = FileManager.default
         do {
-            try fm.createDirectory(at: dirURL, withIntermediateDirectories: true)
-            if !fm.isExecutableFile(atPath: openShimURL.path) {
-                let script = "#!/bin/sh\nexit 1\n"
-                try script.write(to: openShimURL, atomically: true, encoding: .utf8)
-                try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: openShimURL.path)
+            for directory in [parent, dirURL] {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+                var info = stat()
+                guard lstat(directory.path, &info) == 0,
+                      info.st_mode & S_IFMT == S_IFDIR, info.st_uid == getuid() else { return nil }
+                if info.st_mode & 0o777 != 0o700 {
+                    guard chmod(directory.path, 0o700) == 0 else { return nil }
+                }
+                guard lstat(directory.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+                      info.st_uid == getuid(), info.st_mode & 0o077 == 0 else { return nil }
             }
+            let fd = Darwin.open(openShimURL.path, O_CREAT | O_TRUNC | O_WRONLY | O_NOFOLLOW, 0o700)
+            guard fd >= 0 else { return nil }
+            defer { Darwin.close(fd) }
+            var info = stat()
+            guard fstat(fd, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
+                  info.st_uid == getuid(), info.st_nlink == 1, fchmod(fd, 0o700) == 0 else { return nil }
+            let bytes = Array("#!/bin/sh\nexit 1\n".utf8)
+            let written = bytes.withUnsafeBytes { Darwin.write(fd, $0.baseAddress, $0.count) }
+            guard written == bytes.count else { return nil }
             return dirURL.path
         } catch {
             return nil
@@ -271,29 +262,52 @@ class PowerNotchXPCHelper: NSObject, PowerNotchXPCHelperProtocol {
 
             let outputQueue = DispatchQueue(label: "com.powernotch.helper.agy.io")
             var stdoutData = Data()
+            var pipesClosed = false
+            for handle in [stdoutPipe.fileHandleForReading, stderrPipe.fileHandleForReading] {
+                let flags = fcntl(handle.fileDescriptor, F_GETFL)
+                guard flags >= 0, fcntl(handle.fileDescriptor, F_SETFL, flags | O_NONBLOCK) == 0 else {
+                    finishOnce(nil)
+                    return
+                }
+            }
+            // Called only on outputQueue, including during termination cleanup.
+            func readAvailable(_ handle: FileHandle) -> Data? {
+                guard !pipesClosed else { return nil }
+                var bytes = [UInt8](repeating: 0, count: 65536)
+                var count: Int
+                repeat { count = Darwin.read(handle.fileDescriptor, &bytes, bytes.count) } while count < 0 && errno == EINTR
+                return count >= 0 ? Data(bytes.prefix(count)) : nil
+            }
             stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
-                let chunk = handle.availableData
+                let chunk = outputQueue.sync {
+                    let chunk = readAvailable(handle)
+                    if let chunk, !looksLikeInteractiveLogin(chunk) { stdoutData.append(chunk) }
+                    return chunk
+                }
+                guard let chunk else { return }
                 if chunk.isEmpty {
                     handle.readabilityHandler = nil
                 } else {
                     if looksLikeInteractiveLogin(chunk) {
+                        stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                        stderrPipe.fileHandleForReading.readabilityHandler = nil
                         if process.isRunning {
                             process.terminate()
                         }
                         finishOnce(nil)
                         return
                     }
-                    outputQueue.sync {
-                        stdoutData.append(chunk)
-                    }
                 }
             }
             // Drain stderr and immediately abort if interactive OAuth login starts
             stderrPipe.fileHandleForReading.readabilityHandler = { handle in
-                let chunk = handle.availableData
+                let chunk = outputQueue.sync { readAvailable(handle) }
+                guard let chunk else { return }
                 if chunk.isEmpty {
                     handle.readabilityHandler = nil
                 } else if looksLikeInteractiveLogin(chunk) {
+                    stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                    stderrPipe.fileHandleForReading.readabilityHandler = nil
                     if process.isRunning {
                         process.terminate()
                     }
@@ -314,8 +328,24 @@ class PowerNotchXPCHelper: NSObject, PowerNotchXPCHelperProtocol {
                 timeoutWork.cancel()
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
                 stderrPipe.fileHandleForReading.readabilityHandler = nil
-                let trailing = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
                 let combined: Data = outputQueue.sync {
+                    defer {
+                        pipesClosed = true
+                        try? stdoutPipe.fileHandleForReading.close()
+                        try? stderrPipe.fileHandleForReading.close()
+                    }
+                    let fd = stdoutPipe.fileHandleForReading.fileDescriptor
+                    let flags = fcntl(fd, F_GETFL)
+                    var trailing = Data()
+                    if flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0 {
+                        var bytes = [UInt8](repeating: 0, count: 65536)
+                        while true {
+                            let count = Darwin.read(fd, &bytes, bytes.count)
+                            if count < 0 && errno == EINTR { continue }
+                            guard count > 0 else { break }
+                            trailing.append(contentsOf: bytes.prefix(count))
+                        }
+                    }
                     if !trailing.isEmpty {
                         stdoutData.append(trailing)
                     }
@@ -459,13 +489,8 @@ class PowerNotchXPCHelper: NSObject, PowerNotchXPCHelperProtocol {
         let fsCacheDir = "\(cacheDir)/fsCachedData"
         guard FileManager.default.fileExists(atPath: dbPath) else { return nil }
 
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let db else {
-            if let db { sqlite3_close(db) }
-            return nil
-        }
+        guard let db = SQLiteReadOnlyOpener.open(path: dbPath) else { return nil }
         defer { sqlite3_close(db) }
-        sqlite3_busy_timeout(db, 400)
 
         let sql = """
         SELECT d.receiver_data, d.isDataOnFS

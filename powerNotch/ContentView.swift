@@ -56,7 +56,8 @@ struct ContentView: View {
 
     @Default(.customMediaColorData) var customMediaColorData
 
-    @Default(.enableAIUsageNotchTab) var enableAIUsageNotchTab
+    @Default(.enableAIUsageNotchTab) var configuredAIUsageNotchTab
+    private var enableAIUsageNotchTab: Bool { configuredAIUsageNotchTab && !coordinator.isScreenLocked }
 
     @Default(.displayDynamicIslandTuning) var displayDynamicIslandTuning
 
@@ -945,7 +946,7 @@ struct ContentView: View {
               .zIndex(2)
             if vm.notchState == .open {
                 VStack {
-                    switch coordinator.currentView {
+                    switch coordinator.isScreenLocked ? .home : coordinator.currentView {
                     case .home:
                         NotchHomeView(albumArtNamespace: albumArtNamespace)
                     case .shelf:
@@ -1144,11 +1145,12 @@ struct ContentView: View {
 
     @ViewBuilder
     var dragDetector: some View {
-        if Defaults[.boringShelf] && vm.notchState == .closed {
+        if Defaults[.boringShelf] && vm.notchState == .closed && !coordinator.isScreenLocked {
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
         .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $vm.dragDetectorTargeting) { providers in
+            guard !coordinator.isScreenLocked else { return false }
             vm.dropEvent = true
             ShelfStateViewModel.shared.load(providers)
             return true
@@ -1161,6 +1163,7 @@ struct ContentView: View {
     private func preferredTabForPointerLocation(
         _ mouseLocation: NSPoint = NSEvent.mouseLocation
     ) -> NotchViews? {
+        guard !coordinator.isScreenLocked else { return .home }
         guard enableAIUsageNotchTab,
               !coordinator.openLastTabByDefault,
               let screenFrame = getScreenFrame(vm.screenUUID) ?? NSScreen.main?.frame

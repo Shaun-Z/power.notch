@@ -4,7 +4,7 @@
 <dict>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsArbitraryLoads</key>
+		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
 	<key>SUEnableDownloaderService</key>
@@ -15,9 +15,7 @@
 	<string>https://raw.githubusercontent.com/Shaun-Z/power.notch/main/updater/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>B1Y47t8C/v8ImurYA+9arEsuCrpxwJSviekiflMElbI=</string>
-	<key>UTImportedTypeDeclarations</key>
-	<array>
-		<dict/>
-	</array>
+	<key>PowerNotchAppGroup</key>
+	<string>$(TeamIdentifierPrefix)com.powernotch.app</string>
 </dict>
 </plist>

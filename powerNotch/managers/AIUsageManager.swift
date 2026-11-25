@@ -1334,9 +1334,7 @@ extension AIUsageManager {
                     continue
                 }
 
-                var db: OpaquePointer?
-                guard sqlite3_open_v2(fileURL.path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, nil) == SQLITE_OK,
-                      let db
+                guard let db = SQLiteReadOnlyOpener.open(path: fileURL.path)
                 else { continue }
                 defer { sqlite3_close(db) }
                 activeDatabases += 1
@@ -1775,9 +1773,7 @@ extension AIUsageManager {
         let dbPath = openCodeDatabasePath
         guard FileManager.default.fileExists(atPath: dbPath) else { return nil }
 
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, nil) == SQLITE_OK,
-              let db
+        guard let db = SQLiteReadOnlyOpener.open(path: dbPath)
         else { return nil }
         defer { sqlite3_close(db) }
 
@@ -1907,9 +1903,7 @@ extension AIUsageManager {
         let dbPath = openCodeDatabasePath
         guard FileManager.default.fileExists(atPath: dbPath) else { return nil }
 
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, nil) == SQLITE_OK,
-              let db
+        guard let db = SQLiteReadOnlyOpener.open(path: dbPath)
         else {
             return nil
         }
@@ -2830,9 +2824,7 @@ extension AIUsageManager {
     }
 
     nonisolated private static func readSQLiteSingleString(dbPath: String, query: String) -> String? {
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, nil) == SQLITE_OK,
-              let db
+        guard let db = SQLiteReadOnlyOpener.open(path: dbPath)
         else { return nil }
         defer { sqlite3_close(db) }
 

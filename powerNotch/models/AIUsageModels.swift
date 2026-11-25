@@ -815,68 +815,24 @@ struct AIProviderSnapshot: Identifiable, Codable, Equatable, Sendable {
 /// `Application Support/powerNotch/ai-usage-secrets.json` (POSIX 0600) so ad-hoc signed
 /// builds never trigger macOS login Keychain ACL prompts on settings open or rebuilds.
 enum AIUsageKeychainStore {
-    private static let lock = NSLock()
-
-    private static var secretsFileURL: URL? {
-        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        return appSupport
-            .appendingPathComponent("powerNotch", isDirectory: true)
-            .appendingPathComponent("ai-usage-secrets.json", isDirectory: false)
-    }
-
-    private static func loadAllUnlocked() -> [String: String] {
-        guard let url = secretsFileURL,
-              let data = try? Data(contentsOf: url),
-              let decoded = try? JSONDecoder().decode([String: String].self, from: data)
-        else {
-            return [:]
-        }
-        return decoded
-    }
-
-    private static func saveAllUnlocked(_ map: [String: String]) {
-        guard let url = secretsFileURL else { return }
-        let fm = FileManager.default
-        let dir = url.deletingLastPathComponent()
-        do {
-            if !fm.fileExists(atPath: dir.path) {
-                try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-            }
-            try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
-
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.sortedKeys]
-            let data = try encoder.encode(map)
-            try data.write(to: url, options: [.atomic])
-            try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
-        } catch {
-            // Best-effort local persistence
-        }
-    }
+    private static let store: DualTrackSecretStore = {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+        let url = support.appendingPathComponent("powerNotch", isDirectory: true)
+            .appendingPathComponent("ai-usage-secrets.json")
+        return DualTrackSecretStore(fileStore: POSIXAtomicSecretFileStore(fileURL: url))
+    }()
 
     static func readSecret(for provider: AIProviderID, kind: String = "secret") -> String? {
         let key = "\(provider.rawValue).\(kind)"
-        lock.lock()
-        defer { lock.unlock() }
-        guard let raw = loadAllUnlocked()[key] else { return nil }
+        guard let raw = store.read(account: key) else { return nil }
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
 
     static func writeSecret(_ value: String, for provider: AIProviderID, kind: String = "secret") {
         let key = "\(provider.rawValue).\(kind)"
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        lock.lock()
-        defer { lock.unlock() }
-        var map = loadAllUnlocked()
-        if trimmed.isEmpty {
-            map.removeValue(forKey: key)
-        } else {
-            map[key] = trimmed
-        }
-        saveAllUnlocked(map)
+        store.write(value, account: key)
     }
 
     /// Reads an external Keychain item (such as `Claude Code-credentials`) ONLY when the user

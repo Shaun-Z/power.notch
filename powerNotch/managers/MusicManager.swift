@@ -14,6 +14,7 @@ let defaultImage: NSImage = .init(
     accessibilityDescription: "Album Art"
 )!
 
+@MainActor
 class MusicManager: ObservableObject {
     // MARK: - Properties
     static let shared = MusicManager()
@@ -131,7 +132,11 @@ class MusicManager: ObservableObject {
     }
 
     deinit {
-        destroy()
+        debounceIdleTask?.cancel()
+        lyricsFetchTask?.cancel()
+        appleMusicCacheRetryTask?.cancel()
+        flipWorkItem?.cancel()
+        transitionWorkItem?.cancel()
     }
     
     public func destroy() {

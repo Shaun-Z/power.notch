@@ -48,6 +48,7 @@ struct ExpandedItem {
 
 @MainActor
 class BoringViewCoordinator: ObservableObject {
+    @Published var isScreenLocked = (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool ?? false
     static let shared = BoringViewCoordinator()
 
     @Published var currentView: NotchViews = .home
@@ -144,9 +145,10 @@ class BoringViewCoordinator: ObservableObject {
     }
     
     @objc func sneakPeekEvent(_ notification: Notification) {
+        guard let data = (notification.userInfo?["data"] as? Data) ?? notification.userInfo?.values.compactMap({ $0 as? Data }).first else { return }
         let decoder = JSONDecoder()
         if let decodedData = try? decoder.decode(
-            SharedSneakPeek.self, from: notification.userInfo?.first?.value as! Data)
+            SharedSneakPeek.self, from: data)
         {
             let contentType =
                 decodedData.type == "brightness"

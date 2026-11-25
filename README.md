@@ -46,7 +46,7 @@ Say hello to **powerNotch** — turning your Mac's notch or Dynamic Island into 
 
 **System Requirements:**
 
-- macOS **14 Sonoma** or later
+- macOS **15 Sequoia** or later
 - Apple Silicon or Intel Mac
 - macOS **26 or later** for native Liquid Glass
 

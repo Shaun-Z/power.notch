@@ -445,7 +445,7 @@ struct NotchHomeView: View {
     }
 
     private var shouldShowCamera: Bool {
-        Defaults[.showMirror] && webcamManager.cameraAvailable && vm.isCameraExpanded
+        !coordinator.isScreenLocked && Defaults[.showMirror] && webcamManager.cameraAvailable && vm.isCameraExpanded
     }
 
     private var mainContent: some View {
@@ -455,7 +455,7 @@ struct NotchHomeView: View {
                 maxArtWidth: (shouldShowCamera && Defaults[.showCalendar]) ? 136 : 154
             )
 
-            if Defaults[.showCalendar] {
+            if Defaults[.showCalendar] && !coordinator.isScreenLocked {
                 CalendarView()
                     .frame(width: shouldShowCamera ? 170 : 215)
                     .onHover { isHovering in
