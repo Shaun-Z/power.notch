@@ -119,7 +119,7 @@ def sign_app(app: Path) -> None:
         if identifier in OWN_ENTITLEMENTS:
             info_path, updated_info = bundle_info(target)
             # No team can own this App Group in an ad-hoc build. The app/widget
-            # already skip shared storage when the key has no valid team prefix.
+            # use the read-only snapshot fallback when no valid team prefix exists.
             updated_info.pop("PowerNotchAppGroup", None)
             with info_path.open("wb") as stream:
                 plistlib.dump(updated_info, stream, sort_keys=False)

@@ -664,3 +664,36 @@ struct AIUsageWidgetModelBehaviourTests {
         #expect(decoded.schemaVersion == AIUsageWidgetSharedConstants.currentSchemaVersion)
     }
 }
+
+@Suite("Widget storage fallback")
+struct WidgetStorageFallbackTests {
+    private let home = URL(fileURLWithPath: "/Users/widget-fixture", isDirectory: true)
+
+    @Test("Ad-hoc storage uses real home and never probes an unowned App Group")
+    func adHocFallback() {
+        for groupID in ["com.powernotch.app", "$(TeamIdentifierPrefix)com.powernotch.app"] {
+            let url = AIUsageWidgetSharedConstants.payloadFileURL(groupID: groupID, homeDirectory: home) { _ in
+                Issue.record("Unprovisioned group must not be accessed")
+                return nil
+            }
+            #expect(url?.path == "/Users/widget-fixture/Library/Application Support/powerNotch/widget/ai-usage-widget-state.json")
+        }
+    }
+
+    @Test("Provisioned App Group wins over fallback; unavailable container falls back")
+    func appGroupPriority() {
+        let container = URL(fileURLWithPath: "/fixture/group", isDirectory: true)
+        let url = AIUsageWidgetSharedConstants.payloadFileURL(groupID: "TEAM123.com.powernotch.app", homeDirectory: home) { _ in container }
+        #expect(url == container.appendingPathComponent(AIUsageWidgetSharedConstants.payloadFileName))
+        let fallback = AIUsageWidgetSharedConstants.payloadFileURL(groupID: "TEAM123.com.powernotch.app", homeDirectory: home) { _ in nil }
+        #expect(fallback?.path.contains("Application Support/powerNotch/widget/") == true)
+        #expect(AIUsageWidgetSharedConstants.payloadFileURL(groupID: "com.powernotch.app", homeDirectory: nil) { _ in nil } == nil)
+    }
+
+    @Test("Real home resolves to an absolute user directory")
+    func realHome() throws {
+        let url = try #require(AIUsageWidgetSharedConstants.realHomeDirectoryURL())
+        #expect(url.path.hasPrefix("/"))
+        #expect(!url.path.contains("/Library/Containers/"))
+    }
+}

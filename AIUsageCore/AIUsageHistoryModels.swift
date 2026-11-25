@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 enum AIUsageCostSource: String, Codable, Sendable {
     case localEstimate
@@ -170,6 +171,51 @@ enum AIUsageCostSeries {
 }
 
 public enum AIUsageWidgetSharedConstants {
+    // This directory is the widget's sole read-only sandbox exception. Keep it in
+    // sync with PowerNotchWidgetsExtension.entitlements; never store credentials here.
+    public static let fallbackDirectory = "Library/Application Support/powerNotch/widget"
+
+    static func realHomeDirectoryURL() -> URL? {
+        // Foundation home-directory APIs point into the extension's sandbox.
+        // Use a reentrant passwd lookup so app and extension resolve the same home.
+        var entry = passwd()
+        var result: UnsafeMutablePointer<passwd>?
+        var size = 16_384
+        while size <= 1_048_576 {
+            var buffer = [CChar](repeating: 0, count: size)
+            var home: String?
+            let status = buffer.withUnsafeMutableBufferPointer { buffer in
+                let status = getpwuid_r(getuid(), &entry, buffer.baseAddress, buffer.count, &result)
+                if status == 0, result != nil, let directory = entry.pw_dir {
+                    home = String(validatingCString: directory)
+                }
+                return status
+            }
+            if status == ERANGE {
+                size *= 2
+                continue
+            }
+            guard status == 0, let home, home.hasPrefix("/") else { return nil }
+            return URL(fileURLWithPath: home, isDirectory: true)
+        }
+        return nil
+    }
+
+    static func payloadFileURL(
+        groupID: String = appGroupID,
+        homeDirectory: URL? = realHomeDirectoryURL(),
+        groupContainer: (String) -> URL? = {
+            FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: $0)
+        }
+    ) -> URL? {
+        if hasTeamPrefixedAppGroup(groupID), let container = groupContainer(groupID) {
+            return container.appendingPathComponent(payloadFileName, isDirectory: false)
+        }
+        return homeDirectory?
+            .appendingPathComponent(fallbackDirectory, isDirectory: true)
+            .appendingPathComponent(payloadFileName, isDirectory: false)
+    }
+
     public static func hasTeamPrefixedAppGroup(_ groupID: String = appGroupID) -> Bool {
         let suffix = ".com.powernotch.app"
         return groupID.hasSuffix(suffix) && groupID.count > suffix.count && !groupID.contains("$(")

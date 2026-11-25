@@ -59,7 +59,7 @@ Download the latest `.dmg` from the [Releases](https://github.com/Shaun-Z/power.
 > [!IMPORTANT]
 > The app has not been notarized by Apple. After moving the app to `/Applications` and attempting to open it, you may need to open **System Settings → Privacy & Security** and choose **Open Anyway**. Homebrew installs the same app and does not remove this first-launch requirement.
 >
-> Desktop widget data is unavailable in the current downloadable builds. AI usage monitoring inside the app remains available.
+> Version **0.1.1** adds a read-only snapshot fallback for desktop widgets in ad-hoc builds. Version 0.1.0 does not support widget data sharing; AI usage monitoring inside that app remains available.
 
 ### Option 2: Homebrew
 
@@ -74,6 +74,14 @@ brew install --cask Shaun-Z/tap/power-notch
 - Launch **powerNotch** to activate the notch experience.
 - Hover over or click the notch to expand controls, calendar, and shelf.
 - Use the menu bar icon to open Settings and customize appearance, media controllers, lyrics, HUDs, and gestures.
+
+### Desktop widgets in ad-hoc builds
+
+The app and widget prefer the team-prefixed App Group when configured. Builds signed by `.github/scripts/sign_adhoc.py` remove the provisioned group and share a snapshot at `~/Library/Application Support/powerNotch/widget/ai-usage-widget-state.json` instead. Only the app writes this file; the sandboxed widget has a read-only exception for that specific directory. It contains display data, never API keys or OAuth tokens. The directory is created with owner-only access.
+
+Provider-page and chart-metric selections use the widget's own preferences when no App Group is configured. The last snapshot remains readable after the app quits; fetching new usage with the refresh button requires the app to be running. No local HTTP server is used.
+
+Ad-hoc signing and file access do not guarantee WidgetKit registration, rendering, or AppIntent button delivery on every macOS release. Those behaviors need testing with the installed distribution build; upgrades may require re-adding the widget. Version 0.1.0 retains the data-sharing limitation noted above.
 
 ### First-launch defaults
 

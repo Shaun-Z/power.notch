@@ -1223,7 +1223,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = PowerNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = "0.1.1";
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1247,7 +1247,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = PowerNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = "0.1.1";
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1423,7 +1423,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = "0.1.1";
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app;
 				PRODUCT_NAME = powerNotch;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1478,7 +1478,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = "0.1.1";
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app;
 				PRODUCT_NAME = powerNotch;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1515,7 +1515,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = "0.1.1";
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1551,7 +1551,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = "0.1.1";
 				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
