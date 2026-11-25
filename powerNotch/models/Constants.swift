@@ -231,6 +231,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     case appleMusic = "Apple Music"
     case spotify = "Spotify"
     case youtubeMusic = "YouTube Music"
+    case neteaseMusic = "NetEase Cloud Music"
     
     var id: String { self.rawValue }
 }
@@ -445,10 +446,10 @@ extension Defaults.Keys {
     )
     
     // MARK: Battery
-    static let showPowerStatusNotifications = Key<Bool>("showPowerStatusNotifications", default: true)
-    static let showBatteryIndicator = Key<Bool>("showBatteryIndicator", default: true)
-    static let showBatteryPercentage = Key<Bool>("showBatteryPercentage", default: true)
-    static let showPowerStatusIcons = Key<Bool>("showPowerStatusIcons", default: true)
+    static let showPowerStatusNotifications = Key<Bool>("showPowerStatusNotifications", default: false)
+    static let showBatteryIndicator = Key<Bool>("showBatteryIndicator", default: false)
+    static let showBatteryPercentage = Key<Bool>("showBatteryPercentage", default: false)
+    static let showPowerStatusIcons = Key<Bool>("showPowerStatusIcons", default: false)
     
     // MARK: Downloads
     static let enableDownloadListener = Key<Bool>("enableDownloadListener", default: true)

@@ -986,6 +986,35 @@ private struct NotchAIProviderCompactCard: View {
     }
 }
 
+/// Uses the same pinned item as the summary and right wing, without depending on media state.
+struct ClosedNotchAIUsageProviderIconView: View {
+    @Environment(\.notchGlassInk) private var ink
+    @ObservedObject private var usageManager = AIUsageManager.shared
+    @Default(.aiUsagePinnedRingID) private var pinnedRingID
+    @Default(.aiUsageEnabledProviders) private var enabledProvidersRaw
+
+    let containerSide: CGFloat
+
+    var body: some View {
+        let _ = enabledProvidersRaw
+        Group {
+            if let resolved = usageManager.resolvedPinnedItem(pinnedID: pinnedRingID) {
+                switch resolved {
+                case .ring(let provider, _), .balance(let provider, _, _):
+                    AIProviderIconView(provider: provider, size: containerSide * 0.8)
+                        .foregroundStyle(ink.accent(provider.accentColor))
+                        .accessibilityLabel(Text(provider.shortName))
+                }
+            } else {
+                Image(systemName: "chart.bar.xaxis")
+                    .font(.system(size: containerSide * 0.65, weight: .semibold))
+                    .foregroundStyle(Color.effectiveAccent)
+            }
+        }
+        .frame(width: containerSide, height: containerSide)
+    }
+}
+
 /// Compact AI Usage ring gauge with centered provider logo displayed in the closed-notch right wing
 /// when the AI Usage tab is enabled.
 struct ClosedNotchAIUsageRingView: View {
@@ -997,6 +1026,7 @@ struct ClosedNotchAIUsageRingView: View {
     @Default(.aiUsageEnabledProviders) private var enabledProvidersRaw
 
     let containerSide: CGFloat
+    var showsProviderLogo: Bool = true
 
     private var outerLineWidth: CGFloat {
         if containerSide <= 18 {
@@ -1058,7 +1088,7 @@ struct ClosedNotchAIUsageRingView: View {
                                 outerLineWidth: outerLineWidth,
                                 innerLineWidth: innerLineWidth,
                                 ringGap: ringGap,
-                                iconSize: dualCenterIconSize,
+                                iconSize: showsProviderLogo ? dualCenterIconSize : 0,
                                 showsCenterLabel: false
                             )
 
@@ -1081,11 +1111,13 @@ struct ClosedNotchAIUsageRingView: View {
                                 .opacity(isAIUsageFlightActive ? 0 : 1)
                                 .animation(nil, value: isAIUsageFlightActive)
 
-                                AIProviderIconView(provider: provider, size: dualCenterIconSize)
-                                    .foregroundStyle(ink.accent(iconAccent))
-                                    .shadow(color: ink.isClearGlass ? .clear : .black.opacity(0.45), radius: 1, x: 0, y: 0.5)
-                                    .opacity(isAIUsageFlightActive ? 0 : 1)
-                                    .animation(nil, value: isAIUsageFlightActive)
+                                if showsProviderLogo {
+                                    AIProviderIconView(provider: provider, size: dualCenterIconSize)
+                                        .foregroundStyle(ink.accent(iconAccent))
+                                        .shadow(color: ink.isClearGlass ? .clear : .black.opacity(0.45), radius: 1, x: 0, y: 0.5)
+                                        .opacity(isAIUsageFlightActive ? 0 : 1)
+                                        .animation(nil, value: isAIUsageFlightActive)
+                                }
                             }
                         } else {
                             let closedMetrics = AIUsageRingFlightMetrics(
@@ -1093,7 +1125,7 @@ struct ClosedNotchAIUsageRingView: View {
                                 outerLineWidth: outerLineWidth,
                                 innerLineWidth: outerLineWidth,
                                 ringGap: 0,
-                                iconSize: singleCenterIconSize,
+                                iconSize: showsProviderLogo ? singleCenterIconSize : 0,
                                 showsCenterLabel: false
                             )
 
@@ -1112,11 +1144,13 @@ struct ClosedNotchAIUsageRingView: View {
                                 .opacity(isAIUsageFlightActive ? 0 : 1)
                                 .animation(nil, value: isAIUsageFlightActive)
 
-                                AIProviderIconView(provider: provider, size: singleCenterIconSize)
-                                    .foregroundStyle(ink.accent(iconAccent))
-                                    .shadow(color: ink.isClearGlass ? .clear : .black.opacity(0.45), radius: 1, x: 0, y: 0.5)
-                                    .opacity(isAIUsageFlightActive ? 0 : 1)
-                                    .animation(nil, value: isAIUsageFlightActive)
+                                if showsProviderLogo {
+                                    AIProviderIconView(provider: provider, size: singleCenterIconSize)
+                                        .foregroundStyle(ink.accent(iconAccent))
+                                        .shadow(color: ink.isClearGlass ? .clear : .black.opacity(0.45), radius: 1, x: 0, y: 0.5)
+                                        .opacity(isAIUsageFlightActive ? 0 : 1)
+                                        .animation(nil, value: isAIUsageFlightActive)
+                                }
                             }
                         }
                     }
@@ -1580,7 +1614,7 @@ private struct NotchAIUsageRingFlightView: View, Animatable {
                 )
             }
 
-            if iconOpacity > 0.001 {
+            if closedIconSize > 0 && iconOpacity > 0.001 {
                 AIProviderIconView(provider: provider, size: max(4, closedIconSize))
                     .foregroundStyle(ink.accent(provider.accentColor))
                     .shadow(

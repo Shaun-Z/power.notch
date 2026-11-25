@@ -431,3 +431,19 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 This Source Code Form is "Incompatible With Secondary Licenses", as
 defined by the Mozilla Public License, v. 2.0.
+
+-----------------------------------------------------------------------------
+                  GNU General Public License v3.0
+        reference / adaptation:
+        - lyrimuse by Yudaotor and contributors
+          https://github.com/Yudaotor/lyrimuse
+          NetEase client data paths and metadata/ID-first lookup approach
+          Reference revision: 9d74d785be00faca056bc9b5b1575abe7b7820ea
+          Sources: lyrimuse-engine/clientdataroot.go, neteaselocal.go, netease.go;
+                   lyrimuse/Sources/LyrimuseCore/Local/MediaControlClient.swift
+          Reimplemented for powerNotch in MediaCore/NetEaseMusicLibrary.swift
+          Source tree at the referenced revision:
+          https://github.com/Yudaotor/lyrimuse/tree/9d74d785be00faca056bc9b5b1575abe7b7820ea
+          Playback continues to use MediaRemoteAdapter (separate notice above).
+          Full GPL v3 license text: see LICENSE in this repository.
+-----------------------------------------------------------------------------

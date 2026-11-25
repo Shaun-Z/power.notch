@@ -34,6 +34,10 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         return bundleID == "com.apple.Music"
     }
 
+    var supportsShuffleRepeat: Bool {
+        playbackState.bundleIdentifier != NetEaseMusicTrack.bundleIdentifier
+    }
+
     func setFavorite(_ favorite: Bool) async {
         let bundleID = playbackState.bundleIdentifier
         
@@ -225,7 +229,10 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     // MARK: - Update Methods
     private func handleAdapterUpdate(_ update: NowPlayingUpdate) async {
         let payload = update.payload
-        let diff = update.diff ?? false
+        let reportedBundle = payload.parentApplicationBundleIdentifier ?? payload.bundleIdentifier
+        // A different player's first frame must not inherit the previous player's metadata.
+        let changedPlayer = reportedBundle.map { $0 != playbackState.bundleIdentifier } ?? false
+        let diff = (update.diff ?? false) && !changedPlayer
 
         var newPlaybackState = PlaybackState(bundleIdentifier: playbackState.bundleIdentifier)
         

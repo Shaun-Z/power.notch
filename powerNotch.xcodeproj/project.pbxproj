@@ -160,6 +160,8 @@
 		A17000000000000000000012 /* CodexUsageLogParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000002 /* CodexUsageLogParser.swift */; };
 		A17000000000000000000013 /* AIUsageRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000003 /* AIUsageRefreshCoordinator.swift */; };
 		A17000000000000000000014 /* AIUsageHistoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000001 /* AIUsageHistoryModels.swift */; };
+		A18000000000000000000011 /* NetEaseMusicLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A18000000000000000000001 /* NetEaseMusicLibrary.swift */; };
+		A18000000000000000000012 /* NetEaseMusicController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A18000000000000000000002 /* NetEaseMusicController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -363,6 +365,8 @@
 		A17000000000000000000001 /* AIUsageHistoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageHistoryModels.swift; sourceTree = "<group>"; };
 		A17000000000000000000002 /* CodexUsageLogParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageLogParser.swift; sourceTree = "<group>"; };
 		A17000000000000000000003 /* AIUsageRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageRefreshCoordinator.swift; sourceTree = "<group>"; };
+		A18000000000000000000001 /* NetEaseMusicLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetEaseMusicLibrary.swift; sourceTree = "<group>"; };
+		A18000000000000000000002 /* NetEaseMusicController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetEaseMusicController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -495,6 +499,7 @@
 		1153BD8E2D986B1F00979FB0 /* MediaControllers */ = {
 			isa = PBXGroup;
 			children = (
+				A18000000000000000000002 /* NetEaseMusicController.swift */,
 				1132E5232E78D6DA0068732D /* YouTube Music Controller */,
 				1153BD8D2D986B1F00979FB0 /* MediaControllerProtocol.swift */,
 				1153BD922D986E4300979FB0 /* AppleMusicController.swift */,
@@ -613,6 +618,7 @@
 		14CEF4092C5CAED200855D72 = {
 			isa = PBXGroup;
 			children = (
+				A18000000000000000000020 /* MediaCore */,
 				A17000000000000000000020 /* AIUsageCore */,
 				9B9763FE30B2E94000CCA45B /* PowerNotchWidgetsExtension.entitlements */,
 				112B0EB62E30DD0F00562D6C /* mediaremote-adapter */,
@@ -854,6 +860,14 @@
 			path = AIUsageCore;
 			sourceTree = "<group>";
 		};
+		A18000000000000000000020 /* MediaCore */ = {
+			isa = PBXGroup;
+			children = (
+				A18000000000000000000001 /* NetEaseMusicLibrary.swift */,
+			);
+			path = MediaCore;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -1035,6 +1049,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A18000000000000000000011 /* NetEaseMusicLibrary.swift in Sources */,
+				A18000000000000000000012 /* NetEaseMusicController.swift in Sources */,
 				A47000000000000000000002 /* SQLiteReadOnlyOpener.swift in Sources */,
 				A17000000000000000000011 /* AIUsageHistoryModels.swift in Sources */,
 				A27000000000000000000002 /* SubprocessStreamUtilities.swift in Sources */,

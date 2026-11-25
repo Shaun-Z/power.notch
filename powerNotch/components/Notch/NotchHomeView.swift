@@ -252,6 +252,8 @@ struct MusicControlsView: View {
             HoverButton(icon: "shuffle", iconColor: musicManager.isShuffled ? .red : .primary, scale: .medium) {
                 MusicManager.shared.toggleShuffle()
             }
+            .disabled(!musicManager.shuffleRepeatControlSupported)
+            .opacity(musicManager.shuffleRepeatControlSupported ? 1 : 0.35)
         case .previous:
             HoverButton(icon: "backward.fill", scale: .medium) {
                 MusicManager.shared.previousTrack()
@@ -268,6 +270,8 @@ struct MusicControlsView: View {
             HoverButton(icon: repeatIcon, iconColor: repeatIconColor, scale: .medium) {
                 MusicManager.shared.toggleRepeat()
             }
+            .disabled(!musicManager.shuffleRepeatControlSupported)
+            .opacity(musicManager.shuffleRepeatControlSupported ? 1 : 0.35)
         case .volume:
             VolumeControlView()
         case .favorite:

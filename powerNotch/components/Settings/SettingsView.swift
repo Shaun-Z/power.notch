@@ -589,7 +589,11 @@ struct Media: View {
             } header: {
                 Text("Media Source")
             } footer: {
-                if MusicManager.shared.isNowPlayingDeprecated {
+                if mediaController == .neteaseMusic {
+                    Text("Play music in the NetEase Cloud Music macOS app. Song IDs and covers are read from its local library when available. Playback controls apply only while NetEase is the system's current player; favorite, volume, shuffle, and repeat are unavailable.")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                } else if MusicManager.shared.isNowPlayingDeprecated {
                     HStack {
                         Text("YouTube Music requires this third-party app to be installed: ")
                             .foregroundStyle(.secondary)
@@ -615,6 +619,12 @@ struct Media: View {
                     "Show music live activity",
                     isOn: $coordinator.musicLiveActivityEnabled.animation()
                 )
+                Defaults.Toggle(key: .enableLyrics) {
+                    HStack {
+                        Text("Show lyrics")
+                        customBadge(text: "Beta")
+                    }
+                }
                 Toggle("Show sneak peek on playback changes", isOn: $enableSneakPeek)
                 Picker("Sneak Peek Style", selection: $sneakPeekStyles) {
                     ForEach(SneakPeekStyle.allCases) { style in
@@ -650,12 +660,6 @@ struct Media: View {
             
             Section {
                 MusicSlotConfigurationView()
-                Defaults.Toggle(key: .enableLyrics) {
-                    HStack {
-                        Text("Show lyrics below artist name")
-                        customBadge(text: "Beta")
-                    }
-                }
             } header: {
                 Text("Media controls")
             }  footer: {

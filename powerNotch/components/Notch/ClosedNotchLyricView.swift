@@ -173,7 +173,10 @@ struct NotchUnifiedLyricOverlay: View {
     }
 
     private var activeFlightAnimation: Animation? {
-        guard hasMounted && (wasVisible || isVisible) else { return nil }
+        // Settings can reveal a new anchor while the card stays closed. Snap to that
+        // anchor instead of flying from the last visible (possibly expanded) position.
+        // Position flights belong only to card expansion/collapse and open-tab changes.
+        guard hasMounted && isInFlight && (wasVisible || isVisible) else { return nil }
         if isOpen != settledIsOpen {
             return isOpen ? openAnimation : closeAnimation
         }
