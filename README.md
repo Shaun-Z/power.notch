@@ -63,7 +63,7 @@ Download the latest `.dmg` from the [Releases](https://github.com/Shaun-Z/power.
 
 ### Option 2: Homebrew
 
-Once the release and [Shaun-Z/homebrew-tap](https://github.com/Shaun-Z/homebrew-tap) are published, install with:
+Install from [Shaun-Z/homebrew-tap](https://github.com/Shaun-Z/homebrew-tap):
 
 ```bash
 brew install --cask Shaun-Z/tap/power-notch
