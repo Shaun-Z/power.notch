@@ -490,6 +490,18 @@ class WorkflowSmokeTests(unittest.TestCase):
             self.assertIn("is already published", block, job)
             self.assertIn("does not exist; expected the draft", block, job)
 
+    def test_recovery_publication_jobs_allow_the_skipped_build_ancestor(self) -> None:
+        # GitHub adds success() unless a status function is explicit; the
+        # intentionally skipped build must not skip later recovery stages.
+        for name in ("merge_release", "publish_stable", "publish_beta"):
+            block = self.release.split(f"  {name}:\n", 1)[1].split("    needs:", 1)[0]
+            self.assertIn("!cancelled()", block, name)
+            self.assertIn("needs.publish.result == 'success'", block, name)
+        ending = self.release.split("  ending:\n", 1)[1]
+        for name in ("publish", "upgrade-brew", "merge_release", "publish_stable", "publish_beta"):
+            self.assertIn(f"needs.{name}.result == 'success'", ending)
+        self.assertIn('[[ "$RELEASE_SUCCEEDED" == "true" ]]', ending)
+
     def test_release_resume_reads_the_draft_target_commitish(self) -> None:
         # Resuming from a draft must recover its source commit; the
         # list-backed gh release view exposes it as targetCommitish.

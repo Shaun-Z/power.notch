@@ -375,7 +375,7 @@ jobs:
 
   merge_release:
     name: Merge release PR
-    if: ${{ needs.preparation.outputs.is_beta == 'false' && needs.publish.result == 'success' }}
+    if: ${{ !cancelled() && needs.preparation.outputs.is_beta == 'false' && needs.publish.result == 'success' }}
     needs: [preparation, publish]
     runs-on: ubuntu-latest
     permissions:
@@ -432,7 +432,7 @@ jobs:
 
   publish_stable:
     name: Publish stable release
-    if: ${{ needs.preparation.outputs.is_beta == 'false' && needs.publish.result == 'success' && needs.merge_release.result == 'success' }}
+    if: ${{ !cancelled() && needs.preparation.outputs.is_beta == 'false' && needs.publish.result == 'success' && needs.merge_release.result == 'success' }}
     needs: [preparation, publish, merge_release]
     runs-on: ubuntu-latest
     permissions:
@@ -507,7 +507,7 @@ jobs:
 
   publish_beta:
     name: Publish beta release
-    if: ${{ needs.preparation.outputs.is_beta == 'true' && needs.publish.result == 'success' }}
+    if: ${{ !cancelled() && needs.preparation.outputs.is_beta == 'true' && needs.publish.result == 'success' }}
     needs: [preparation, publish]
     runs-on: ubuntu-latest
     permissions:
@@ -703,7 +703,7 @@ jobs:
       contents: read
     env:
       ALL_RESULTS: ${{ join(needs.*.result, ',') }}
-      RELEASE_SUCCEEDED: ${{ !contains(join(needs.*.result, ','), 'failure') && !contains(join(needs.*.result, ','), 'cancelled') }}
+      RELEASE_SUCCEEDED: ${{ needs.preparation.result == 'success' && needs.publish.result == 'success' && needs.upgrade-brew.result == 'success' && ((needs.preparation.outputs.is_beta == 'true' && needs.publish_beta.result == 'success') || (needs.preparation.outputs.is_beta == 'false' && needs.merge_release.result == 'success' && needs.publish_stable.result == 'success')) }}
       IS_BETA: ${{ needs.preparation.outputs.is_beta }}
       VERSION: ${{ needs.preparation.outputs.version }}
       BUILD_NUMBER: ${{ needs.preparation.outputs.build_number }}
@@ -719,10 +719,12 @@ jobs:
           fi
           {
             if [[ "${RELEASE_SUCCEEDED}" == "true" ]]; then
-              echo "✅ Released powerNotch v${VERSION} (${BUILD_TYPE} build ${BUILD_NUMBER})"
+              echo "✅ Released powerNotch v${VERSION} (${BUILD_TYPE}${BUILD_NUMBER:+ build ${BUILD_NUMBER}})"
               echo "🍺 Homebrew cask updated"
               echo "📱 Sparkle appcast updated"
             else
               echo "❌ Release failed${VERSION:+ for powerNotch v${VERSION}}"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+          # A skipped required publication stage is a failure, not a release.
+          [[ "$RELEASE_SUCCEEDED" == "true" ]]
