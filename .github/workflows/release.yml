@@ -622,6 +622,12 @@ jobs:
             depends_on macos: :sequoia
             app "powerNotch.app"
 
+            postflight_steps do
+              run "/usr/bin/xattr",
+                  args: ["-dr", "com.apple.quarantine", "{{appdir}}/powerNotch.app"],
+                  must_succeed: false
+            end
+
             uninstall quit: "com.powernotch.app"
 
             zap trash: [
