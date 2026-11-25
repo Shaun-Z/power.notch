@@ -251,21 +251,7 @@ struct NotchUnifiedLyricOverlay: View {
                     beginTransitionWindow(duration: 0.34)
                 }
                 .onChange(of: isTransitioning) { _, transitioning in
-                    guard !transitioning else { return }
-                    settledIsOpen = isOpen
-                    lastTransitionWasTabSwitch = false
-                    if isOpen {
-                        if isHomeTab, let rect = currentOpenRect {
-                            settledOpenRect = rect
-                        }
-                    } else {
-                        if let rect = currentClosedRect {
-                            settledClosedRect = rect
-                        } else if !showClosedLyrics {
-                            settledClosedRect = .zero
-                        }
-                    }
-                    wasVisible = isVisible
+                    finishTransition(transitioning)
                 }
                 .onChange(of: showBottomEdgeOpenLyrics) { _, _ in
                     if !isInFlight {
@@ -273,47 +259,79 @@ struct NotchUnifiedLyricOverlay: View {
                     }
                 }
                 .onChange(of: currentClosedRect) { _, newRect in
-                    if !isInFlight && !isOpen {
-                        if let newRect {
-                            settledClosedRect = newRect
-                        } else if !showClosedLyrics {
-                            settledClosedRect = .zero
-                        }
-                    } else if settledClosedRect == .zero, let newRect, !isOpen {
-                        settledClosedRect = newRect
-                    }
-                    wasVisible = isVisible
+                    updateClosedPosition(newRect)
                 }
                 .onChange(of: currentOpenRect) { _, newRect in
-                    if !isInFlight && isOpen && isHomeTab, let newRect {
-                        settledOpenRect = newRect
-                    }
-                    wasVisible = isVisible
+                    updateOpenPosition(newRect)
                 }
                 .onAppear {
-                    settledIsOpen = isOpen
-                    if let rect = currentClosedRect {
-                        settledClosedRect = rect
-                    }
-                    if let rect = currentOpenRect {
-                        settledOpenRect = rect
-                    }
-                    if targetRect.width > 0 && targetRect.height > 0 {
-                        lastValidRect = targetRect
-                    }
-                    wasVisible = isVisible
-                    hasMounted = true
+                    mountOverlay(at: targetRect)
                 }
-                .onDisappear {
-                    transitionResetTask?.cancel()
-                    transitionResetTask = nil
-                    marqueeTask?.cancel()
-                    marqueeTask = nil
-                    hasMounted = false
-                }
+                .onDisappear(perform: unmountOverlay)
             }
         }
         .allowsHitTesting(false)
+    }
+
+    private func finishTransition(_ transitioning: Bool) {
+        guard !transitioning else { return }
+        settledIsOpen = isOpen
+        lastTransitionWasTabSwitch = false
+        if isOpen {
+            if isHomeTab, let rect = currentOpenRect {
+                settledOpenRect = rect
+            }
+        } else {
+            if let rect = currentClosedRect {
+                settledClosedRect = rect
+            } else if !showClosedLyrics {
+                settledClosedRect = .zero
+            }
+        }
+        wasVisible = isVisible
+    }
+
+    private func updateClosedPosition(_ newRect: CGRect?) {
+        if !isInFlight && !isOpen {
+            if let newRect {
+                settledClosedRect = newRect
+            } else if !showClosedLyrics {
+                settledClosedRect = .zero
+            }
+        } else if settledClosedRect == .zero, let newRect, !isOpen {
+            settledClosedRect = newRect
+        }
+        wasVisible = isVisible
+    }
+
+    private func updateOpenPosition(_ newRect: CGRect?) {
+        if !isInFlight && isOpen && isHomeTab, let newRect {
+            settledOpenRect = newRect
+        }
+        wasVisible = isVisible
+    }
+
+    private func mountOverlay(at targetRect: CGRect) {
+        settledIsOpen = isOpen
+        if let rect = currentClosedRect {
+            settledClosedRect = rect
+        }
+        if let rect = currentOpenRect {
+            settledOpenRect = rect
+        }
+        if targetRect.width > 0 && targetRect.height > 0 {
+            lastValidRect = targetRect
+        }
+        wasVisible = isVisible
+        hasMounted = true
+    }
+
+    private func unmountOverlay() {
+        transitionResetTask?.cancel()
+        transitionResetTask = nil
+        marqueeTask?.cancel()
+        marqueeTask = nil
+        hasMounted = false
     }
 
     private func lyricFlightTimeline(
@@ -358,69 +376,83 @@ struct NotchUnifiedLyricOverlay: View {
             .animation(flightAnimation, value: targetRect)
             .animation(flightAnimation, value: targetInlineProgress)
             .background {
-                // Measure single-line natural width without affecting layout
-                Text(line)
-                    .font(font)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .hidden()
-                    .background {
-                        GeometryReader { textGeo in
-                            Color.clear
-                                .onAppear {
-                                    updateMeasuredWidth(
-                                        textGeo.size.width,
-                                        line: line,
-                                        containerWidth: activeContainerWidth,
-                                        at: timeline.date
-                                    )
-                                }
-                                .onChange(of: textGeo.size.width) { _, newWidth in
-                                    updateMeasuredWidth(
-                                        newWidth,
-                                        line: line,
-                                        containerWidth: activeContainerWidth,
-                                        at: timeline.date
-                                    )
-                                }
-                                .onChange(of: line) { _, newLine in
-                                    updateMeasuredWidth(
-                                        textGeo.size.width,
-                                        line: newLine,
-                                        containerWidth: activeContainerWidth,
-                                        at: timeline.date
-                                    )
-                                }
-                                .onChange(of: displayMode) { _, _ in
-                                    updateMeasuredWidth(
-                                        textGeo.size.width,
-                                        line: line,
-                                        containerWidth: activeContainerWidth,
-                                        at: timeline.date
-                                    )
-                                }
-                                .onChange(of: activeContainerWidth) { oldWidth, newWidth in
-                                    guard abs(newWidth - oldWidth) > 0.5 else { return }
-                                    updateMeasuredWidth(
-                                        textGeo.size.width,
-                                        line: line,
-                                        containerWidth: newWidth,
-                                        at: timeline.date
-                                    )
-                                }
-                                .onChange(of: isVisible) { _, visible in
-                                    guard visible else { return }
-                                    updateMeasuredWidth(
-                                        textGeo.size.width,
-                                        line: line,
-                                        containerWidth: activeContainerWidth,
-                                        at: timeline.date
-                                    )
-                                }
-                        }
-                    }
+                lyricWidthMeasurement(
+                    line: line,
+                    font: font,
+                    containerWidth: activeContainerWidth,
+                    at: timeline.date
+                )
             }
         }
+    }
+
+    private func lyricWidthMeasurement(
+        line: String,
+        font: Font,
+        containerWidth: CGFloat,
+        at date: Date
+    ) -> some View {
+        // Measure single-line natural width without affecting layout
+        Text(line)
+            .font(font)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .hidden()
+            .background {
+                GeometryReader { textGeo in
+                    Color.clear
+                        .onAppear {
+                            updateMeasuredWidth(
+                                textGeo.size.width,
+                                line: line,
+                                containerWidth: containerWidth,
+                                at: date
+                            )
+                        }
+                        .onChange(of: textGeo.size.width) { _, newWidth in
+                            updateMeasuredWidth(
+                                newWidth,
+                                line: line,
+                                containerWidth: containerWidth,
+                                at: date
+                            )
+                        }
+                        .onChange(of: line) { _, newLine in
+                            updateMeasuredWidth(
+                                textGeo.size.width,
+                                line: newLine,
+                                containerWidth: containerWidth,
+                                at: date
+                            )
+                        }
+                        .onChange(of: displayMode) { _, _ in
+                            updateMeasuredWidth(
+                                textGeo.size.width,
+                                line: line,
+                                containerWidth: containerWidth,
+                                at: date
+                            )
+                        }
+                        .onChange(of: containerWidth) { oldWidth, newWidth in
+                            guard abs(newWidth - oldWidth) > 0.5 else { return }
+                            updateMeasuredWidth(
+                                textGeo.size.width,
+                                line: line,
+                                containerWidth: newWidth,
+                                at: date
+                            )
+                        }
+                        .onChange(of: isVisible) { _, visible in
+                            guard visible else { return }
+                            updateMeasuredWidth(
+                                textGeo.size.width,
+                                line: line,
+                                containerWidth: containerWidth,
+                                at: date
+                            )
+                        }
+                }
+            }
     }
 
     private func beginTransitionWindow(duration: Double? = nil) {
