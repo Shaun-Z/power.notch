@@ -434,6 +434,45 @@ class WorkflowSmokeTests(unittest.TestCase):
         self.assertNotIn("artifact-metadata", self.release)
         self.assertNotIn('startswith("nightly-")', self.release)
 
+    def test_signed_appcast_runs_for_stable_and_beta_in_system_bash(self) -> None:
+        step = self.release.split("      - name: Generate signed appcast\n", 1)[1]
+        script = step.split("        run: |\n", 1)[1].split("\n      - name:", 1)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tool = root / "generate_appcast"
+            tool.write_text('#!/bin/bash\nprintf "%s\\n" "$@" > "$ARGUMENTS_FILE"\ncat > "$KEY_INPUT_FILE"\n')
+            tool.chmod(0o755)
+            for is_beta in ("false", "true"):
+                with self.subTest(is_beta=is_beta):
+                    arguments = root / "arguments"
+                    key_input = root / "key-input"
+                    result = subprocess.run(
+                        ["/bin/bash", "-c", textwrap.dedent(script)],
+                        env={
+                            **os.environ,
+                            "RUNNER_TEMP": directory,
+                            "ARGUMENTS_FILE": str(arguments),
+                            "KEY_INPUT_FILE": str(key_input),
+                            "SPARKLE_PRIVATE_KEY": "test-key-fixture",
+                            "GITHUB_REPOSITORY": "Shaun-Z/power.notch",
+                            "VERSION": "0.1.0",
+                            "IS_BETA": is_beta,
+                            "BETA_CHANNEL_NAME": "beta",
+                        },
+                        capture_output=True, text=True, timeout=10,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    actual = arguments.read_text().splitlines()
+                    self.assertEqual(actual[:2], ["--ed-key-file", "-"])
+                    self.assertIn("--embed-release-notes", actual)
+                    self.assertEqual(key_input.read_text(), "test-key-fixture")
+                    expected_output = "appcast-beta.xml" if is_beta == "true" else "appcast-stable.xml"
+                    self.assertEqual(actual[-3:], ["-o", expected_output, "Release/"])
+                    if is_beta == "true":
+                        self.assertEqual(actual[actual.index("--channel") + 1], "beta")
+                    else:
+                        self.assertNotIn("--channel", actual)
+
     def test_release_never_probes_releases_by_tag_for_draft_state(self) -> None:
         # The /releases/tags REST endpoint 404s for draft releases even with
         # write access, so release-state decisions must never call it.
