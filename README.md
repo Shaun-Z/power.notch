@@ -24,14 +24,14 @@
 ---
 
 > [!NOTE]
-> **powerNotch** is an independent fork of **[boringNotch](https://github.com/TheBoredTeam/boring.notch)** ([TheBoredTeam/boring.notch](https://github.com/TheBoredTeam/boring.notch)). Full credit goes to TheBoredTeam and all boringNotch contributors for creating the original project and architecture. This repository tracks the `main` branches of boringNotch and [lyrimuse](https://github.com/Yudaotor/lyrimuse) as upstream references while maintaining its own `main` and `dev` branches. NetEase integration references lyrimuse; this does not imply that all lyrimuse features are included.
+> **powerNotch** is an independent fork of **[boringNotch](https://github.com/TheBoredTeam/boring.notch)** ([TheBoredTeam/boring.notch](https://github.com/TheBoredTeam/boring.notch)). Full credit goes to TheBoredTeam and all boringNotch contributors for creating the original project and architecture. NetEase Cloud Music support also draws on [lyrimuse](https://github.com/Yudaotor/lyrimuse); powerNotch does not include all lyrimuse features.
 
 Say hello to **powerNotch** — turning your Mac's notch or Dynamic Island into a music control center with real-time lyrics, calendar and reminders integration, a file shelf with AirDrop support, a mirror/webcam view, and replacements for volume and brightness HUDs.
 
 ## Features
 
 - **Music Live Activity & Visualizer** — Dynamic playback controls and audio visualizer right in the notch (Apple Music, Spotify, YouTube Music, and system Now Playing).
-- **NetEase Cloud Music** — Dedicated macOS client source with system playback state and controls, local song-ID/cover lookup, and ID-first synchronized lyrics, following [lyrimuse's approach](https://github.com/Yudaotor/lyrimuse).
+- **NetEase Cloud Music** — Playback controls, track information, artwork, and synchronized lyrics for the native macOS client (experimental).
 - **Closed-Notch Real-Time Lyrics** — Displays synchronized lyrics below the closed notch on notched screens, or inside the collapsed Dynamic Island on other screens, with multi-source fallback (LRCLIB, NetEase, LewdHuTao, lyrics.ovh), adapted from [lycrics_notch](https://github.com/Dreammmmix/lycrics_notch).
 - **Calendar & Reminders Integration** — Quick overview of upcoming events and reminders.
 - **File Shelf with AirDrop Support** — Drag and drop files into the notch for temporary holding and quick sharing.
@@ -40,7 +40,7 @@ Say hello to **powerNotch** — turning your Mac's notch or Dynamic Island into 
 - **Mirror (Webcam)** — Quick camera preview directly from the notch.
 - **Customizable Gestures & Sizing** — Fine-tune notch dimensions and interactions for different display sizes.
 - **Liquid Glass & Dynamic Island** — Per-display Notch/Dynamic Island modes, Follow system/Light/Dark/Custom glass colors, and an app-specific opacity control. Native Liquid Glass requires macOS 26 or later; earlier versions use a blur material fallback.
-- **Physical Notch Blending** — A solid black collapsed surface and a static, soft pill-shaped ink blend in the expanded glass card. Top-edge reflections are suppressed on notched displays; displays without a physical notch do not use the ink blend.
+- **Physical Notch Blending** — A black collapsed surface and soft shading blend the expanded glass card into your Mac's physical notch.
 - **AI Usage & Desktop Widgets** — Optional provider quota, balance, and usage-history views, with desktop widgets. Available readings depend on the provider, credentials, and local history; the notch tab is disabled by default.
 - **Developer Options** — Unlock animation speed controls and per-display Dynamic Island position and height adjustments by clicking the version number five times in About.
 
@@ -57,36 +57,11 @@ Say hello to **powerNotch** — turning your Mac's notch or Dynamic Island into 
 Download the latest `.dmg` from the [Releases](https://github.com/Shaun-Z/power.notch/releases) page, open it, and drag **powerNotch.app** into `/Applications`.
 
 > [!IMPORTANT]
-> Because this app is not notarized with an Apple Developer account, macOS may warn that powerNotch is from an unidentified developer on first launch. You only need to clear the quarantine attribute once:
+> The app has not been notarized by Apple. After moving the app to `/Applications` and attempting to open it, you may need to open **System Settings → Privacy & Security** and choose **Open Anyway**. Homebrew installs the same app and does not remove this first-launch requirement.
 >
-> ```bash
-> xattr -dr com.apple.quarantine "/Applications/powerNotch.app"
-> ```
->
-> Alternatively, open **System Settings** > **Privacy & Security** and click **Open Anyway** next to the powerNotch warning.
+> Desktop widget data is unavailable in the current downloadable builds. AI usage monitoring inside the app remains available.
 
-### Option 2: Building from Source
-
-#### Prerequisites
-- **macOS 15.6 or later**
-- **Xcode 26 or later**
-
-#### Steps
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/Shaun-Z/power.notch.git
-   cd power.notch
-   ```
-
-2. **Open the project in Xcode:**
-   ```bash
-   open powerNotch.xcodeproj
-   ```
-
-3. **Build and run:**
-   - Select the `powerNotch` scheme and press `Cmd + R`.
-
-### Homebrew tap
+### Option 2: Homebrew
 
 Once the release and [Shaun-Z/homebrew-tap](https://github.com/Shaun-Z/homebrew-tap) are published, install with:
 
@@ -122,13 +97,11 @@ Change each display's **Notch / Dynamic Island / Off** mode in **Settings → Ge
 
 ### NetEase Cloud Music
 
-In **Settings → Media → Music Source**, choose **NetEase Cloud Music**, then play music in the macOS NetEase client. Track metadata, playback position, play/pause, previous/next, and seeking use the existing bundled MediaRemote adapter. Commands are sent only while NetEase owns the system Now Playing session; another app taking over clears the dedicated source rather than controlling that app.
+In **Settings → Media → Music Source**, choose **NetEase Cloud Music**, then play a track in the native macOS NetEase client. You can view track information, artwork, and lyrics, and use play/pause, previous/next, and seeking controls. Enable lyrics in Settings if they are not visible.
 
-Read-only lookup of the client's queue, library, and history supports both App Store and standalone data locations. Matching requires the song title and artist, checks album/duration when available, and rejects ambiguous versions. An exact local ID enables direct NetEase LRC lookup; unreadable caches, changed schemas, or unavailable lyrics fall back to the existing lyrics providers. Local history is never treated as live playback state. Some macOS privacy configurations may prevent reading the App Store client's container; metadata from Now Playing still works without that lookup.
+Keep NetEase as the active system media player. When another app takes over playback, the dedicated NetEase source stops controlling playback. Local track lookup may be unavailable under some macOS privacy settings; track information can still appear, and lyrics may fall back to another provider.
 
-Favorite, app volume, shuffle, and repeat controls are unavailable for this source. This integration targets the native macOS client (`com.netease.163music`), not the iPad app or browser player.
-
-The integration builds successfully and has automated coverage for metadata decoding, matching, lyric responses, and read-only database lookup. Live playback, seeking, artwork, and lyric timing still need verification with the NetEase macOS client.
+Favorite, app volume, shuffle, and repeat controls are unavailable for this source. The integration is experimental and supports the native macOS client, not the iPad app or browser player.
 
 ### Glass appearance
 
@@ -155,30 +128,7 @@ Per-display position and height overrides take effect on displays set to **Dynam
 
 ### Expansion and collapse
 
-The glass background, outline, and content clipping share the same animated surface geometry. The physical-notch ink blend stays static and is clipped by that surface. Use a slower animation speed in Developer options to inspect transitions on your display; the geometry synchronization has been checked in hosted-window tests, while visual behavior still needs confirmation on the target display.
-
-## Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a pull request.
-
-Run `swift test` from the repository root for AI usage and NetEase metadata regression tests. The Swift Testing targets compile the same AI history models, Codex event parser, refresh coordinator, and NetEase metadata/lyrics helpers used by the app. NetEase tests use temporary queue and SQLite fixtures. These tests do not launch the app, access personal credentials or music caches, or call live provider APIs. The normal push/PR build and shared release build use Xcode 26.6.
-
-AI usage history attributes Codex token increments to each event's local calendar day. Thread-level SQLite totals are excluded because they cannot establish daily usage. Cost history preserves currency and source: charts prefer balance-derived spend and otherwise show USD API-equivalent estimates with `≈`. A chart uses one currency and source across the entire period; missing observations are not filled with estimates from a different source. Legacy ledger costs without currency metadata are omitted rather than relabeled.
-
-### Publishing a release
-
-Prepare exactly one open, mergeable `dev` → `main` release PR in this repository, then run **Actions → Deploy powerNotch → Run workflow** from `main`, with version `0.1.0` for the first release. The workflow builds the PR's exact head commit and uses its title and body as release notes. Stable releases merge that PR before publication. Existing draft releases can be resumed from their original build source.
-
-The release workflow uploads `powerNotch.dmg` to [Shaun-Z/power.notch](https://github.com/Shaun-Z/power.notch/releases), updates `updater/appcast.xml`, and writes the version and downloaded DMG's SHA-256 to `Casks/power-notch.rb` in `Shaun-Z/homebrew-tap`. Create that public tap repository with an initial commit (for example, a README) before publishing; the workflow creates the `Casks` directory.
-
-Configure these GitHub Actions values in the app repository:
-
-- Variables: `DEVELOPMENT_TEAM_ID`, `RELEASE_APP_CLIENT_ID`.
-- Secrets: `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`, `KEYCHAIN_PASSWORD`, `RELEASE_APP_PRIVATE_KEY`, `PRIVATE_SPARKLE_KEY`.
-- Install the release GitHub App on both `power.notch` and `homebrew-tap`, with Contents write access, and grant Pull requests write access for the release PR in `power.notch`.
-- Ensure `PRIVATE_SPARKLE_KEY` matches `SUPublicEDKey` in `powerNotch/Info.plist`. The private key is never committed to this repository.
-
-The app reads the update feed directly from `https://raw.githubusercontent.com/Shaun-Z/power.notch/main/updater/appcast.xml`, so application updates do not require GitHub Pages. The checked-in feed starts empty; the release workflow adds the signed enclosure for the actual build. The current build workflow uses Apple Development signing and does not notarize the app; publishing does not change that signing policy.
+Hover over or click the notch to expand it. Use **Developer options → Animation speed** to adjust how quickly it opens and closes.
 
 ## Acknowledgments
 

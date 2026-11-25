@@ -14,7 +14,7 @@
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/Shaun-Z/power.notch/main/updater/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>B1Y47t8C/v8ImurYA+9arEsuCrpxwJSviekiflMElbI=</string>
+	<string>N3iuadNmM3KyIxijW2rESF8+1fdZ/Ff38KZRmh7DNg0=</string>
 	<key>PowerNotchAppGroup</key>
 	<string>$(TeamIdentifierPrefix)com.powernotch.app</string>
 </dict>
