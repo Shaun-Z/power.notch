@@ -9,7 +9,7 @@ permissions: {}
 jobs:
   comment:
     name: Sync PR target guidance comment
-    if: ${{ github.event.pull_request.head.repo.fork == true }}
+    if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -55,8 +55,8 @@ jobs:
               pull_number: prNumber
             });
 
-            if (pr.data.head.repo.fork !== true) {
-              core.info('PR does not come from a fork; skipping comment sync.');
+            if (pr.data.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`) {
+              core.info('PR comes from this repository; skipping external-fork guidance.');
               return;
             }
 

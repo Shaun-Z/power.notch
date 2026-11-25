@@ -103,7 +103,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   build:
-    name: Build and sign app
+    name: Build and ad-hoc sign app
     needs: authorize
     if: ${{ needs.authorize.outputs.is_admin == 'true' }}
     uses: ./.github/workflows/build_reusable.yml
@@ -112,7 +112,3 @@ jobs:
       version: ${{ inputs.version || '' }}
       build_number: ${{ needs.authorize.outputs.build_number }}
       update_channel: ${{ inputs.update_channel || 'stable' }}
-    secrets:
-      BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-      P12_PASSWORD:              ${{ secrets.P12_PASSWORD }}
-      KEYCHAIN_PASSWORD:         ${{ secrets.KEYCHAIN_PASSWORD }}

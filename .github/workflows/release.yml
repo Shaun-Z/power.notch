@@ -240,7 +240,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   build:
-    name: Build and sign
+    name: Build and ad-hoc sign
     if: ${{ needs.preparation.outputs.resume == 'false' }}
     needs: preparation
     permissions:
@@ -251,10 +251,6 @@ jobs:
       version: ${{ needs.preparation.outputs.version }}
       build_number: ${{ needs.preparation.outputs.build_number }}
       update_channel: ${{ needs.preparation.outputs.is_beta == 'true' && 'beta' || 'stable' }}
-    secrets:
-      BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
 
   publish:
     name: Publish draft release and appcast
@@ -376,6 +372,7 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           repositories: ${{ github.event.repository.name }}
           permission-contents: write
+          permission-pull-requests: write
 
       - name: Merge release PR
         env:
@@ -605,7 +602,7 @@ jobs:
               strategy :github_latest
             end
             auto_updates true
-            depends_on macos: :sonoma
+            depends_on macos: :sequoia
             app "powerNotch.app"
 
             uninstall quit: "com.powernotch.app"

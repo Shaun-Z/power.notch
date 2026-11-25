@@ -38,13 +38,19 @@ jobs:
       env:
         DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
       run: swift test
-    - # TODO: pin to immutable SHA
-      uses: mxcl/xcodebuild@d3ee9b419c1be9a988086c58fe0988f32d99cfc5 # v3.6.0
-      with:
-        xcode: ${{ matrix.xcode }}
-        platform: ${{ matrix.platform }}
-        scheme: ${{ matrix.scheme }}
-        action: build
-        verbosity: xcpretty
-        upload-logs: always
-        configuration: release
+    - name: Build without Apple signing credentials
+      env:
+        DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
+      run: |
+        xcodebuild \
+          -project powerNotch.xcodeproj \
+          -scheme "${{ matrix.scheme }}" \
+          -configuration Release \
+          -destination "platform=macOS" \
+          -onlyUsePackageVersionsFromResolvedFile \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY= \
+          DEVELOPMENT_TEAM= \
+          REGISTER_APP_GROUPS=NO \
+          build
