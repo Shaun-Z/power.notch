@@ -694,16 +694,95 @@ jobs:
           cd homebrew-tap
           git -c http.extraheader="$AUTH_HEADER" push origin "HEAD:refs/heads/$(git symbolic-ref --short HEAD)"
 
+  sync_published_version:
+    name: Save published version to repository
+    if: ${{ !cancelled() && needs.upgrade-brew.result == 'success' && ((needs.preparation.outputs.is_beta == 'true' && needs.publish_beta.result == 'success') || (needs.preparation.outputs.is_beta == 'false' && needs.publish_stable.result == 'success')) }}
+    needs: [preparation, publish_stable, publish_beta, upgrade-brew]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.preparation.outputs.version }}
+      IS_BETA: ${{ needs.preparation.outputs.is_beta }}
+    steps:
+      - name: Create release app token
+        id: release_app_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          token: ${{ steps.release_app_token.outputs.token }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: appcast-${{ needs.preparation.outputs.is_beta }}
+          path: ${{ runner.temp }}/published-appcast
+
+      - name: Sync actual published version without overwriting development work
+        env:
+          RELEASE_APP_TOKEN: ${{ steps.release_app_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$RELEASE_APP_TOKEN" | base64 | tr -d '\n')"
+          # Keep helpers outside the checkout: checking out a branch predating
+          # this feature must not replace the scripts currently executing.
+          SCRIPT_DIR="$RUNNER_TEMP/published-version-tools"
+          mkdir -p "$SCRIPT_DIR"
+          cp .github/scripts/{sync_published_version,stamp_version}.py "$SCRIPT_DIR/"
+          BRANCHES=(main dev)
+          APPCAST="$RUNNER_TEMP/published-appcast/appcast-stable.xml"
+          if [[ "$IS_BETA" == "true" ]]; then
+            # A beta does not merge dev's code into main; keep main's stable version.
+            BRANCHES=(dev)
+            APPCAST="$RUNNER_TEMP/published-appcast/appcast-beta.xml"
+          fi
+          for branch in "${BRANCHES[@]}"; do
+            synced=false
+            for attempt in 1 2 3; do
+              git -c http.extraheader="$AUTH_HEADER" fetch --no-tags origin "refs/heads/$branch:refs/remotes/origin/$branch"
+              git checkout -B "sync-version-$branch" "refs/remotes/origin/$branch"
+              python3 "$SCRIPT_DIR/sync_published_version.py" \
+                --pbxproj "$PROJECT_NAME.xcodeproj/project.pbxproj" \
+                --appcast "$APPCAST" --version "$VERSION"
+              git add "$PROJECT_NAME.xcodeproj/project.pbxproj"
+              if git diff --cached --quiet; then
+                synced=true
+                break
+              fi
+              git commit -m "Sync project version after publishing v${VERSION}"
+              # Ordinary push only. If the branch advanced, recompute the small
+              # version-only change on its new head instead of forcing an update.
+              if git -c http.extraheader="$AUTH_HEADER" push origin "HEAD:refs/heads/$branch"; then
+                synced=true
+                break
+              fi
+              echo "Branch $branch advanced; retrying version sync ($attempt/3)."
+            done
+            if [[ "$synced" != "true" ]]; then
+              echo "::error::Could not sync $branch; rerun this failed job to retry."
+              exit 1
+            fi
+          done
+
   ending:
     name: Finalize
     if: ${{ always() && needs.preparation.result != 'skipped' }}
-    needs: [preparation, build, publish, merge_release, publish_stable, publish_beta, upgrade-brew]
+    needs: [preparation, build, publish, merge_release, publish_stable, publish_beta, upgrade-brew, sync_published_version]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     env:
       ALL_RESULTS: ${{ join(needs.*.result, ',') }}
-      RELEASE_SUCCEEDED: ${{ needs.preparation.result == 'success' && needs.publish.result == 'success' && needs.upgrade-brew.result == 'success' && ((needs.preparation.outputs.is_beta == 'true' && needs.publish_beta.result == 'success') || (needs.preparation.outputs.is_beta == 'false' && needs.merge_release.result == 'success' && needs.publish_stable.result == 'success')) }}
+      RELEASE_SUCCEEDED: ${{ needs.preparation.result == 'success' && needs.publish.result == 'success' && needs.upgrade-brew.result == 'success' && needs.sync_published_version.result == 'success' && ((needs.preparation.outputs.is_beta == 'true' && needs.publish_beta.result == 'success') || (needs.preparation.outputs.is_beta == 'false' && needs.merge_release.result == 'success' && needs.publish_stable.result == 'success')) }}
       IS_BETA: ${{ needs.preparation.outputs.is_beta }}
       VERSION: ${{ needs.preparation.outputs.version }}
       BUILD_NUMBER: ${{ needs.preparation.outputs.build_number }}
@@ -722,6 +801,7 @@ jobs:
               echo "✅ Released powerNotch v${VERSION} (${BUILD_TYPE}${BUILD_NUMBER:+ build ${BUILD_NUMBER}})"
               echo "🍺 Homebrew cask updated"
               echo "📱 Sparkle appcast updated"
+              echo "🔢 Published version saved to repository"
             else
               echo "❌ Release failed${VERSION:+ for powerNotch v${VERSION}}"
             fi

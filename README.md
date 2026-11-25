@@ -138,6 +138,13 @@ Per-display position and height overrides take effect on displays set to **Dynam
 
 Hover over or click the notch to expand it. Use **Developer options → Animation speed** to adjust how quickly it opens and closes.
 
+### Published build numbers
+
+GitHub assigns each published build a number above both the project setting and previously distributed builds. After a successful stable release, the workflow saves the actual shipped version and build number back to `main` and `dev`. Beta releases update `dev` only; nightly releases save their actual number to `dev` with the nightly appcast. Pull the updated branch to use those numbers in local Xcode builds.
+
+Synchronization changes only version settings, never increments the shipped number again, and preserves newer development versions/build numbers. Concurrent branch changes are retained; a rejected stable/beta push is retried on the latest head without force. If synchronization fails after publication, rerun the failed job rather than publishing the same release again.
+
+
 ## Acknowledgments
 
 **powerNotch** would not exist without the amazing open-source projects and communities behind it:

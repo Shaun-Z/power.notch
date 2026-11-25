@@ -281,6 +281,7 @@ jobs:
           GH_TOKEN: ${{ steps.release_app_token.outputs.token }}
           REPO: ${{ github.repository }}
           APPCAST_PATH: updater/${{ env.APPCAST_FILE }}
+          PBXPROJ_PATH: powerNotch.xcodeproj/project.pbxproj
         run: |
           set -euo pipefail
           # The appcast commit must sit on top of the current branch head. dev
@@ -305,16 +306,26 @@ jobs:
           # reverted by this update.
           gh api "repos/${REPO}/contents/${APPCAST_PATH}?ref=${CURRENT_HEAD}" \
             --jq '.content' | base64 --decode > current-appcast.xml
-          cmp -s "updater/${APPCAST_FILE}" current-appcast.xml && {
-            echo "No changes detected in ${APPCAST_FILE}; skipping commit and ref update."; exit 0;
-          }
+          gh api "repos/${REPO}/contents/${PBXPROJ_PATH}?ref=${CURRENT_HEAD}" \
+            --jq '.content' | base64 --decode > current-project.pbxproj
+          cp current-project.pbxproj published-project.pbxproj
+          # The rolling release is already published. Save its actual build
+          # alongside the appcast, preserving any newer dev version settings.
+          python3 .github/scripts/sync_published_version.py \
+            --pbxproj published-project.pbxproj --appcast "updater/${APPCAST_FILE}"
+          if cmp -s "updater/${APPCAST_FILE}" current-appcast.xml && cmp -s published-project.pbxproj current-project.pbxproj; then
+            echo "Appcast and project version already synced; skipping commit and ref update."
+            exit 0
+          fi
 
           # Create the appcast commit through the Git Database API without
           # author or committer fields so GitHub signs it as the bot.
           TREE_BODY="$(jq -n --arg tree "$CURRENT_TREE" --arg path "$APPCAST_PATH" \
+            --arg project_path "$PBXPROJ_PATH" --rawfile project published-project.pbxproj \
             --rawfile appcast "updater/${APPCAST_FILE}" \
             '{base_tree: $tree,
-              tree: [{path: $path, mode: "100644", type: "blob", content: $appcast}]
+              tree: [{path: $path, mode: "100644", type: "blob", content: $appcast},
+                     {path: $project_path, mode: "100644", type: "blob", content: $project}]
             }'
           )"
           # A garbage response fails the tree creation; the follow-up commit
