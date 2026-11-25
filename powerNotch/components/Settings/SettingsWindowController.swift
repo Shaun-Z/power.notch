@@ -67,6 +67,7 @@ class SettingsWindowController: NSWindowController {
     }
     
     func showWindow() {
+        guard !BoringViewCoordinator.shared.isScreenLocked else { return }
         // Set app to regular mode first
         NSApp.setActivationPolicy(.regular)
         
@@ -88,6 +89,7 @@ class SettingsWindowController: NSWindowController {
         
         // Force window to front after activation
         DispatchQueue.main.async { [weak self] in
+            guard !BoringViewCoordinator.shared.isScreenLocked else { return }
             self?.window?.makeKeyAndOrderFront(nil)
         }
     }
@@ -96,6 +98,8 @@ class SettingsWindowController: NSWindowController {
         super.close()
         relinquishFocus()
     }
+
+    func closeWindow() { close() }
     
     private func relinquishFocus() {
         window?.orderOut(nil)

@@ -284,9 +284,7 @@ enum AIUsageHistoryCollector {
         let dbPath = "\(homePath)/.local/share/opencode/opencode.db"
         guard FileManager.default.fileExists(atPath: dbPath) else { return [:] }
 
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, nil) == SQLITE_OK,
-              let db
+        guard let db = SQLiteReadOnlyOpener.open(path: dbPath)
         else { return [:] }
         defer { sqlite3_close(db) }
 
@@ -402,9 +400,7 @@ enum AIUsageHistoryCollector {
                     continue
                 }
 
-                var db: OpaquePointer?
-                guard sqlite3_open_v2(fileURL.path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, nil) == SQLITE_OK,
-                      let db
+                guard let db = SQLiteReadOnlyOpener.open(path: fileURL.path)
                 else { continue }
                 defer { sqlite3_close(db) }
 

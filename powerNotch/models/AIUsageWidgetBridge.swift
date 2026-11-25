@@ -10,75 +10,12 @@ import Foundation
 import SwiftUI
 import WidgetKit
 
-enum AIUsageWidgetBridgeConstants {
-    static let appGroupID = "877W5ZP5WY.com.powernotch.app"
-    static let widgetKind = "com.powernotch.app.aiUsageWidget"
-    static let payloadFileName = "ai-usage-widget-state.json"
-    static let refreshRequestNotification = Notification.Name("com.powernotch.app.aiUsage.requestRefresh")
-}
-
-struct AIUsageWidgetPayload: Codable, Sendable {
-    let schemaVersion: Int
-    let updatedAt: Date
-    let showRemainingPercent: Bool
-    let hideAccountEmails: Bool
-    let providers: [AIUsageWidgetProviderPage]
-}
-
-struct AIUsageWidgetProviderPage: Codable, Identifiable, Sendable, Equatable {
-    let id: String
-    let displayName: String
-    let shortName: String
-    let iconAssetName: String
-    let symbolName: String
-    let accentRed: Double
-    let accentGreen: Double
-    let accentBlue: Double
-    let innerRed: Double
-    let innerGreen: Double
-    let innerBlue: Double
-    let planName: String?
-    let accountLabel: String?
-    let sourceLabel: String?
-    let statusNote: String?
-    let errorMessage: String?
-    let updatedAt: Date?
-    let ringGroups: [AIUsageWidgetRingGroup]
-    let balance: AIUsageWidgetBalance?
-    let dailyHistory: [AIUsageWidgetDailyPoint]
-    let costCurrencySymbol: String
-}
-
-struct AIUsageWidgetRingGroup: Codable, Identifiable, Sendable, Equatable {
-    let id: String
-    let label: String
-    let outerWindow: AIUsageWidgetWindow
-    let innerWindow: AIUsageWidgetWindow?
-}
-
-struct AIUsageWidgetWindow: Codable, Identifiable, Sendable, Equatable {
-    let id: String
-    let label: String
-    let usedPercent: Double
-    let detailText: String?
-    let resetAt: Date?
-    let isEstimated: Bool
-}
-
-struct AIUsageWidgetBalance: Codable, Sendable, Equatable {
-    let currency: String
-    let remaining: Double?
-    let usedThisPeriod: Double?
-    let limit: Double?
-    let periodLabel: String?
-    let formattedRemaining: String
-    let compactFormattedRemaining: String
-    let formattedBreakdown: String?
-}
+typealias AIUsageWidgetBridgeConstants = AIUsageWidgetSharedConstants
 
 enum AIUsageWidgetSync {
     private static func containerFileURL() -> URL? {
-        FileManager.default
+        guard AIUsageWidgetSharedConstants.hasTeamPrefixedAppGroup() else { return nil }
+        return FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: AIUsageWidgetBridgeConstants.appGroupID)?
             .appendingPathComponent(AIUsageWidgetBridgeConstants.payloadFileName, isDirectory: false)
     }
@@ -165,7 +102,7 @@ enum AIUsageWidgetSync {
         }
 
         let payload = AIUsageWidgetPayload(
-            schemaVersion: 3,
+            schemaVersion: AIUsageWidgetSharedConstants.currentSchemaVersion,
             updatedAt: Date(),
             showRemainingPercent: showRemainingPercent,
             hideAccountEmails: hideAccountEmails,

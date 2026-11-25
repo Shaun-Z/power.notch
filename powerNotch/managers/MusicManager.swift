@@ -14,6 +14,7 @@ let defaultImage: NSImage = .init(
     accessibilityDescription: "Album Art"
 )!
 
+@MainActor
 class MusicManager: ObservableObject {
     // MARK: - Properties
     static let shared = MusicManager()
@@ -46,6 +47,7 @@ class MusicManager: ObservableObject {
     @Published var repeatMode: RepeatMode = .off
     @Published var volume: Double = 0.5
     @Published var volumeControlSupported: Bool = true
+    @Published var shuffleRepeatControlSupported: Bool = true
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Published var usingAppIconForArtwork: Bool = false
     @Published var currentLyrics: String = ""
@@ -131,7 +133,11 @@ class MusicManager: ObservableObject {
     }
 
     deinit {
-        destroy()
+        debounceIdleTask?.cancel()
+        lyricsFetchTask?.cancel()
+        appleMusicCacheRetryTask?.cancel()
+        flipWorkItem?.cancel()
+        transitionWorkItem?.cancel()
     }
     
     public func destroy() {
@@ -171,14 +177,17 @@ class MusicManager: ObservableObject {
             newController = SpotifyController()
         case .youtubeMusic:
             newController = YouTubeMusicController()
+        case .neteaseMusic:
+            newController = NetEaseMusicController()
         }
 
         // Set up state observation for the new controller
         if let controller = newController {
             controller.playbackStatePublisher
                 .receive(on: DispatchQueue.main)
-                .sink { [weak self] state in
+                .sink { [weak self, weak controller] state in
                     guard let self = self,
+                          let controller,
                           self.activeController === controller else { return }
                     self.updateFromPlaybackState(state)
                 }
@@ -213,6 +222,8 @@ class MusicManager: ObservableObject {
         activeController = controller
         
         self.canFavoriteTrack = controller.supportsFavorite
+        self.volumeControlSupported = controller.supportsVolumeControl
+        self.shuffleRepeatControlSupported = controller.supportsShuffleRepeat
 
         // Get current state from active controller
         forceUpdate()
@@ -221,6 +232,7 @@ class MusicManager: ObservableObject {
     // MARK: - Update Methods
     @MainActor
     private func updateFromPlaybackState(_ state: PlaybackState) {
+        shuffleRepeatControlSupported = activeController?.supportsShuffleRepeat ?? false
         // Check for playback state changes (playing/paused)
         if state.isPlaying != self.isPlaying {
             NSLog("Playback state changed: \(state.isPlaying ? "Playing" : "Paused")")
@@ -436,6 +448,20 @@ class MusicManager: ObservableObject {
         self.syncedLyrics = []
 
         lyricsFetchTask = Task { @MainActor in
+
+            // NetEase's own client supplies the exact ID; do not search by a potentially
+            // ambiguous title when that ID is available. Missing/blocked caches fall through.
+            if bundleIdentifier == NetEaseMusicTrack.bundleIdentifier,
+               let track = await NetEaseMusicLibrary.shared.track(title: title, artist: artist, album: album, duration: duration),
+               !Task.isCancelled,
+               let lrc = await NetEaseMusicLyrics.fetch(songID: track.id),
+               !Task.isCancelled, self.lastLyricsTrackKey == trackKey {
+                let parsed = self.parseLRC(lrc)
+                if !parsed.isEmpty {
+                    self.applyLyricsResult(LyricFetchResult(plainText: parsed.map(\.text).joined(separator: "\n"), synced: parsed), trackKey: trackKey)
+                    return
+                }
+            }
 
             // Layer 1: Apple Music local TTML cache (zero-config, exact official timing)
             if isAppleMusic {
@@ -1388,12 +1414,14 @@ class MusicManager: ObservableObject {
     }
 
     func toggleShuffle() {
+        guard shuffleRepeatControlSupported else { return }
         Task {
             await activeController?.toggleShuffle()
         }
     }
 
     func toggleRepeat() {
+        guard shuffleRepeatControlSupported else { return }
         Task {
             await activeController?.toggleRepeat()
         }

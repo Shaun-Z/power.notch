@@ -130,7 +130,9 @@ class BatteryStatusViewModel: ObservableObject {
     deinit {
         print("🔌 Cleaning up battery monitoring...")
         if let managerBatteryId: Int = managerBatteryId {
-            managerBattery.removeObserver(byId: managerBatteryId)
+            Task { @MainActor [managerBattery] in
+                managerBattery.removeObserver(byId: managerBatteryId)
+            }
         }
     }
 

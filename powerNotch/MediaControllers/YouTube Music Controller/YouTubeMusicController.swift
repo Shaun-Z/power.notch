@@ -66,6 +66,12 @@ final class YouTubeMusicController: MediaControllerProtocol {
         }
     }
     
+    deinit {
+        appStateObserver?.cancel()
+        artworkFetchTask?.cancel()
+        updateTimer?.invalidate()
+    }
+
     // MARK: - MediaControllerProtocol Implementation
     func play() async { await sendCommand(endpoint: "/play", method: "POST") }
     
@@ -174,6 +180,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
             return
         }
         
+        reconnectDelay = configuration.reconnectDelay.lowerBound
         await initializeIfAppActive()
     }
     
@@ -183,17 +190,14 @@ final class YouTubeMusicController: MediaControllerProtocol {
             return
         }
         
-        Task { @MainActor in
-            stopPeriodicUpdates()
-            appStateObserver?.cancel()
-        }
-        
-        Task {
-            await webSocketClient?.disconnect()
-            webSocketClient = nil
-        }
-        
+        stopPeriodicUpdates()
+        artworkFetchTask?.cancel()
+        artworkFetchTask = nil
+        reconnectDelay = configuration.reconnectDelay.lowerBound
+        let client = webSocketClient
+        webSocketClient = nil
         resetPlaybackState()
+        await client?.disconnect()
     }
     
     private func initializeIfAppActive() async {

@@ -91,6 +91,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     func onScreenLocked(_ notification: Notification) {
         isScreenLocked = true
+        coordinator.isScreenLocked = true
+        coordinator.currentView = .home
+        closeNotchTask?.cancel()
+        viewModels.values.forEach { $0.close() }
+        WebcamManager.shared.stopSession()
+        SettingsWindowController.shared.closeWindow()
+        cleanupDragDetectors()
         if !Defaults[.showOnLockScreen] {
             cleanupWindows()
         } else {
@@ -101,6 +108,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     func onScreenUnlocked(_ notification: Notification) {
         isScreenLocked = false
+        coordinator.isScreenLocked = false
+        setupDragDetectors()
         if !Defaults[.showOnLockScreen] {
             adjustWindowPosition(changeAlpha: true)
         } else {
@@ -162,6 +171,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupDragDetectors() {
+        guard !isScreenLocked else { return }
         cleanupDragDetectors()
 
         guard Defaults[.expandedDragDetection] else { return }
@@ -199,6 +209,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleDragEntersNotchRegion(onScreen screen: NSScreen) {
+        guard !isScreenLocked else { return }
         guard let uuid = screen.displayUUID, let viewModel = viewModels[uuid] else { return }
         viewModel.open()
         coordinator.currentView = .shelf
@@ -258,6 +269,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        isScreenLocked = coordinator.isScreenLocked
 
         NotificationCenter.default.addObserver(
             self,

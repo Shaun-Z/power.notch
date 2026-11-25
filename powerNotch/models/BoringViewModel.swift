@@ -226,7 +226,7 @@ class BoringViewModel: NSObject, ObservableObject {
 
     func close() {
         // Do not close while a share picker or sharing service is active
-        if SharingStateManager.shared.preventNotchClose {
+        if SharingStateManager.shared.preventNotchClose && !coordinator.isScreenLocked {
             return
         }
 
@@ -241,7 +241,9 @@ class BoringViewModel: NSObject, ObservableObject {
         // Preserve the last tab when "Remember last tab" is enabled.
         // Otherwise, switch to shelf if it contains files and openShelfByDefault is enabled,
         // or reset to home.
-        if !coordinator.openLastTabByDefault {
+        if coordinator.isScreenLocked {
+            coordinator.currentView = .home
+        } else if !coordinator.openLastTabByDefault {
             if !ShelfStateViewModel.shared.isEmpty && Defaults[.openShelfByDefault] {
                 coordinator.currentView = .shelf
             } else {

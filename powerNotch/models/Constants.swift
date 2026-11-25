@@ -68,28 +68,15 @@ enum DisplayNotchSettings {
     /// Returns whether the notch should be shown on the given display.
     static func isEnabled(for screen: NSScreen) -> Bool {
         guard let uuid = screen.displayUUID else { return false }
-        return isEnabled(forUUID: uuid, connectedScreens: NSScreen.screens)
+        return isEnabled(forUUID: uuid)
     }
 
     static func isEnabled(
         forUUID uuid: String,
-        connectedScreens: [NSScreen] = NSScreen.screens
+        overrides: [String: Bool] = Defaults[.displayNotchVisibility]
     ) -> Bool {
-        let overrides = Defaults[.displayNotchVisibility]
-        if let explicit = overrides[uuid] {
-            return explicit
-        }
-        let hasAnyEnabledConnected = connectedScreens.contains { screen in
-            guard let screenUUID = screen.displayUUID else { return false }
-            return overrides[screenUUID] == true
-        }
-        if !hasAnyEnabledConnected {
-            if let mainUUID = NSScreen.main?.displayUUID {
-                return uuid == mainUUID
-            }
-            return uuid == connectedScreens.first?.displayUUID
-        }
-        return false
+        // Every display is enabled out of the box; an explicit Off choice wins.
+        overrides[uuid] ?? true
     }
 
     /// Returns all currently connected displays that have the notch enabled.
@@ -98,7 +85,7 @@ enum DisplayNotchSettings {
     ) -> [NSScreen] {
         connectedScreens.filter { screen in
             guard let uuid = screen.displayUUID else { return false }
-            return isEnabled(forUUID: uuid, connectedScreens: connectedScreens)
+            return isEnabled(forUUID: uuid)
         }
     }
 
@@ -113,10 +100,7 @@ enum DisplayNotchSettings {
         for screen in connectedScreens {
             guard let uuid = screen.displayUUID else { continue }
             if updated[uuid] == nil {
-                updated[uuid] = isEnabled(
-                    forUUID: uuid,
-                    connectedScreens: connectedScreens
-                )
+                updated[uuid] = isEnabled(forUUID: uuid)
             }
         }
         updated[targetUUID] = enabled
@@ -124,17 +108,26 @@ enum DisplayNotchSettings {
         NotificationCenter.default.post(name: .displayNotchVisibilityChanged, object: nil)
     }
 
-    /// Returns whether Dynamic Island shape is enabled for the given display UUID,
-    /// falling back to the global `dynamicIslandShape` default when no per-display override exists.
+    /// Explicit per-display and global choices win; otherwise use the display's hardware.
     static func usesDynamicIsland(
         forUUID uuid: String?,
         overrides: [String: Bool] = Defaults[.displayDynamicIslandShape],
-        defaultEnabled: Bool = Defaults[.dynamicIslandShape]
+        defaultEnabled: Bool? = Defaults[.dynamicIslandShape]
     ) -> Bool {
-        guard let uuid, let explicit = overrides[uuid] else {
-            return defaultEnabled
-        }
-        return explicit
+        let screen = uuid.flatMap { NSScreen.screen(withUUID: $0) } ?? NSScreen.main
+        return resolvedDynamicIslandMode(
+            hasPhysicalNotch: (screen?.safeAreaInsets.top ?? 0) > 0,
+            override: uuid.flatMap { overrides[$0] },
+            defaultEnabled: defaultEnabled
+        )
+    }
+
+    static func resolvedDynamicIslandMode(
+        hasPhysicalNotch: Bool,
+        override: Bool?,
+        defaultEnabled: Bool?
+    ) -> Bool {
+        override ?? defaultEnabled ?? !hasPhysicalNotch
     }
 
     /// Sets Dynamic Island vs. Hanging Notch shape for a single display while preserving the
@@ -149,7 +142,7 @@ enum DisplayNotchSettings {
         for screen in connectedScreens {
             guard let uuid = screen.displayUUID else { continue }
             if updated[uuid] == nil {
-                updated[uuid] = fallback
+                updated[uuid] = usesDynamicIsland(forUUID: uuid, overrides: updated, defaultEnabled: fallback)
             }
         }
         updated[targetUUID] = enabled
@@ -238,6 +231,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     case appleMusic = "Apple Music"
     case spotify = "Spotify"
     case youtubeMusic = "YouTube Music"
+    case neteaseMusic = "NetEase Cloud Music"
     
     var id: String { self.rawValue }
 }
@@ -392,12 +386,14 @@ extension Defaults.Keys {
             if (UserDefaults.standard.object(forKey: "developerClearLiquidGlass") as? Bool) == true {
                 return .light
             }
-            return .dark
+            return .followSystem
         }()
     )
-    static let liquidGlassOpacity = Key<Double>("liquidGlassOpacity", default: 1.0)
+    static let liquidGlassOpacity = Key<Double>("liquidGlassOpacity", default: 0.95)
     static let customGlassColorData = Key<Data?>("customGlassColorData", default: nil)
-    static let dynamicIslandShape = Key<Bool>("dynamicIslandShape", default: false)
+    // nil means automatic per-display mode. Persisted Bool values from earlier versions
+    // and the explicit "all displays" actions retain their existing meaning.
+    static let dynamicIslandShape = Key<Bool?>("dynamicIslandShape", default: nil)
     static let displayDynamicIslandShape = Key<[String: Bool]>("displayDynamicIslandShape", default: [:])
 
     static let showNotHumanFace = Key<Bool>("showNotHumanFace", default: false)
@@ -450,10 +446,10 @@ extension Defaults.Keys {
     )
     
     // MARK: Battery
-    static let showPowerStatusNotifications = Key<Bool>("showPowerStatusNotifications", default: true)
-    static let showBatteryIndicator = Key<Bool>("showBatteryIndicator", default: true)
-    static let showBatteryPercentage = Key<Bool>("showBatteryPercentage", default: true)
-    static let showPowerStatusIcons = Key<Bool>("showPowerStatusIcons", default: true)
+    static let showPowerStatusNotifications = Key<Bool>("showPowerStatusNotifications", default: false)
+    static let showBatteryIndicator = Key<Bool>("showBatteryIndicator", default: false)
+    static let showBatteryPercentage = Key<Bool>("showBatteryPercentage", default: false)
+    static let showPowerStatusIcons = Key<Bool>("showPowerStatusIcons", default: false)
     
     // MARK: Downloads
     static let enableDownloadListener = Key<Bool>("enableDownloadListener", default: true)
@@ -492,7 +488,7 @@ extension Defaults.Keys {
     static let hideNotchOption = Key<HideNotchOption>("hideNotchOption", default: .nowPlayingOnly)
     
     // MARK: Media Controller
-    static let mediaController = Key<MediaControllerType>("mediaController", default: defaultMediaController)
+    @MainActor static let mediaController = Key<MediaControllerType>("mediaController", default: defaultMediaController)
     
     // MARK: Advanced Settings
     static let useCustomAccentColor = Key<Bool>("useCustomAccentColor", default: false)
@@ -501,7 +497,7 @@ extension Defaults.Keys {
     static let hideTitleBar = Key<Bool>("hideTitleBar", default: true)
     
     // Helper to determine the default media controller based on NowPlaying deprecation status
-    static var defaultMediaController: MediaControllerType {
+    @MainActor static var defaultMediaController: MediaControllerType {
         if MusicManager.shared.isNowPlayingDeprecated {
             return .appleMusic
         } else {
@@ -512,7 +508,7 @@ extension Defaults.Keys {
     static let didClearLegacyURLCacheV1 = Key<Bool>("didClearLegacyURLCache_v1", default: false)
 
     // MARK: AI Usage Monitor
-    static let enableAIUsageNotchTab = Key<Bool>("enableAIUsageNotchTab", default: true)
+    static let enableAIUsageNotchTab = Key<Bool>("enableAIUsageNotchTab", default: false)
     static let aiUsageRefreshInterval = Key<Int>("aiUsageRefreshInterval", default: 300)
     static let aiUsageShowRemainingPercent = Key<Bool>("aiUsageShowRemainingPercent", default: false)
     static let aiUsageHideAccountEmails = Key<Bool>("aiUsageHideAccountEmails", default: false)

@@ -56,7 +56,8 @@ struct ContentView: View {
 
     @Default(.customMediaColorData) var customMediaColorData
 
-    @Default(.enableAIUsageNotchTab) var enableAIUsageNotchTab
+    @Default(.enableAIUsageNotchTab) var configuredAIUsageNotchTab
+    private var enableAIUsageNotchTab: Bool { configuredAIUsageNotchTab && !coordinator.isScreenLocked }
 
     @Default(.displayDynamicIslandTuning) var displayDynamicIslandTuning
 
@@ -87,7 +88,7 @@ struct ContentView: View {
         }
         if (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
             && (musicManager.isPlaying || !musicManager.isPlayerIdle)
-            && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
+            && (coordinator.musicLiveActivityEnabled || isInlineMusicSneakPeekActive) && !vm.hideOnClosed
         {
             return true
         }
@@ -294,7 +295,7 @@ struct ContentView: View {
             chinWidth = 640
         } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
             && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle)
-            && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
+            && (coordinator.musicLiveActivityEnabled || isInlineMusicSneakPeekActive) && !vm.hideOnClosed
         {
             chinWidth += (closedAIUsageBalancedLeftWidth + closedAIUsageEffectiveRightWidth + 20)
         } else if !coordinator.expandingView.show && vm.notchState == .closed
@@ -332,7 +333,7 @@ struct ContentView: View {
             && musicManager.isPlaying
             && (!musicManager.syncedLyrics.isEmpty
                 || !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            && coordinator.musicLiveActivityEnabled
+            && (coordinator.musicLiveActivityEnabled || isInlineMusicSneakPeekActive)
             && !vm.hideOnClosed
     }
 
@@ -340,7 +341,6 @@ struct ContentView: View {
         vm.notchState == .closed
             && !hasPhysicalNotch
             && hasActiveMusicLyrics
-            && !isInlineMusicSneakPeekActive
             && (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
     }
 
@@ -353,7 +353,7 @@ struct ContentView: View {
     private var isShowingMusicClosedLiveActivity: Bool {
         (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
             && (musicManager.isPlaying || !musicManager.isPlayerIdle)
-            && coordinator.musicLiveActivityEnabled
+            && (coordinator.musicLiveActivityEnabled || isInlineMusicSneakPeekActive)
             && !vm.hideOnClosed
     }
 
@@ -434,11 +434,15 @@ struct ContentView: View {
     private var isShowingClosedAIUsageSummaryInCenter: Bool {
         vm.notchState == .closed
             && !hasPhysicalNotch
-            && isShowingAIUsageClosedLiveActivity
+            && enableAIUsageNotchTab
+            && !vm.hideOnClosed
+            && (!coordinator.expandingView.show || isInlineMusicSneakPeekActive)
+            && (isShowingAIUsageClosedLiveActivity
+                || (isShowingMusicClosedLiveActivity && !enableLyrics))
     }
 
     private var shouldShowFluidMusicRim: Bool {
-        enableAIUsageNotchTab && musicManager.isPlaying
+        enableAIUsageNotchTab && coordinator.musicLiveActivityEnabled && musicManager.isPlaying
     }
 
     private var resolvedFluidMusicRimColor: NSColor {
@@ -879,7 +883,7 @@ struct ContentView: View {
                       } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && vm.notchState == .closed {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress, rowHeight: closedRowHeight)
                               .transition(.opacity)
-                      } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed {
+                      } else if vm.notchState == .closed && isShowingMusicClosedLiveActivity {
                           MusicLiveActivity()
                               .frame(alignment: .center)
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && enableAIUsageNotchTab && !vm.hideOnClosed {
@@ -945,7 +949,7 @@ struct ContentView: View {
               .zIndex(2)
             if vm.notchState == .open {
                 VStack {
-                    switch coordinator.currentView {
+                    switch coordinator.isScreenLocked ? .home : coordinator.currentView {
                     case .home:
                         NotchHomeView(albumArtNamespace: albumArtNamespace)
                     case .shelf:
@@ -987,8 +991,8 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func closedAIUsageRightWing(side: CGFloat) -> some View {
-        ClosedNotchAIUsageRingView(containerSide: side)
+    private func closedAIUsageRightWing(side: CGFloat, showsProviderLogo: Bool = true) -> some View {
+        ClosedNotchAIUsageRingView(containerSide: side, showsProviderLogo: showsProviderLogo)
             .frame(
                 minWidth: max(0, side + gestureProgress / 2),
                 minHeight: side,
@@ -1010,19 +1014,22 @@ struct ContentView: View {
     func AIUsageClosedLiveActivity() -> some View {
         let side = closedLiveActivitySide
         HStack(spacing: closedLiveActivitySpacing) {
-            closedAlbumArtThumbnail(side: side)
+            ClosedNotchAIUsageProviderIconView(containerSide: side)
                 .frame(width: closedAIUsageBalancedLeftWidth, height: side, alignment: .leading)
 
             Rectangle()
                 .fill(liquidGlassNotch ? .clear : .black)
                 .overlay {
-                    if !hasPhysicalNotch {
+                    if isShowingClosedAIUsageSummaryInCenter {
                         ClosedNotchAIUsageSummaryView(closedHeight: closedVisualHeight)
                     }
                 }
                 .frame(width: vm.closedNotchSize.width + -cornerRadiusInsets.closed.top)
 
-            closedAIUsageRightWing(side: side)
+            closedAIUsageRightWing(
+                side: side,
+                showsProviderLogo: false
+            )
         }
         .frame(
             height: closedRowHeight,
@@ -1054,6 +1061,8 @@ struct ContentView: View {
     @ViewBuilder
     func MusicLiveActivity() -> some View {
         let side = closedLiveActivitySide
+        let previewSideWidth = max(0, (380 - vm.closedNotchSize.width - 24) / 2)
+        let previewFontSize = min(14, max(8.5, closedVisualHeight * 0.46))
         HStack(spacing: closedLiveActivitySpacing) {
             closedAlbumArtThumbnail(side: side)
                 .frame(width: closedAIUsageBalancedLeftWidth, height: side, alignment: .leading)
@@ -1061,27 +1070,44 @@ struct ContentView: View {
             Rectangle()
                 .fill(liquidGlassNotch ? .clear : .black)
                 .overlay(
-                    HStack(alignment: .top) {
+                    HStack(alignment: .center, spacing: 12) {
                         if coordinator.expandingView.show
                             && coordinator.expandingView.type == .music
                         {
                             MarqueeText(
                                 .constant(musicManager.songTitle),
+                                font: .system(size: previewFontSize),
                                 textColor: notchInk.secondary(0.65),
                                 minDuration: 0.4,
-                                frameWidth: 100
+                                frameWidth: previewSideWidth
                             )
+                            .frame(width: previewSideWidth, height: closedRowHeight)
                             .opacity(
                                 (coordinator.expandingView.show
                                     && Defaults[.sneakPeekStyles] == .inline)
                                     ? 1 : 0
                             )
-                            Spacer(minLength: vm.closedNotchSize.width)
+                            // Only hardware-notched screens need an empty center. Keep
+                            // the regular lyric/usage slot visible during inline previews.
+                            Color.clear
+                                .frame(width: vm.closedNotchSize.width)
+                                .overlay {
+                                    if isShowingClosedAIUsageSummaryInCenter {
+                                        ClosedNotchAIUsageSummaryView(closedHeight: closedVisualHeight)
+                                    }
+                                }
+                                .conditionalModifier(shouldShowClosedLyricsInNotch && isInlineMusicSneakPeekActive) { view in
+                                    view.anchorPreference(key: NotchLyricAnchorKey.self, value: .bounds) {
+                                        NotchLyricAnchors(closed: $0)
+                                    }
+                                }
                             // Song Artist
                             Text(musicManager.artistName)
+                                .font(.system(size: previewFontSize))
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                                 .foregroundStyle(notchInk.secondary(0.65))
+                                .frame(width: previewSideWidth, height: closedRowHeight, alignment: .trailing)
                                 .opacity(
                                     (coordinator.expandingView.show
                                         && coordinator.expandingView.type == .music
@@ -1099,9 +1125,14 @@ struct ContentView: View {
                         : vm.closedNotchSize.width
                             + -cornerRadiusInsets.closed.top
                 )
-                .conditionalModifier(shouldShowClosedLyricsInNotch) { view in
+                .conditionalModifier(shouldShowClosedLyricsInNotch && !isInlineMusicSneakPeekActive) { view in
                     view.anchorPreference(key: NotchLyricAnchorKey.self, value: .bounds) {
                         NotchLyricAnchors(closed: $0)
+                    }
+                }
+                .overlay {
+                    if isShowingClosedAIUsageSummaryInCenter && !isInlineMusicSneakPeekActive {
+                        ClosedNotchAIUsageSummaryView(closedHeight: closedVisualHeight)
                     }
                 }
 
@@ -1144,11 +1175,12 @@ struct ContentView: View {
 
     @ViewBuilder
     var dragDetector: some View {
-        if Defaults[.boringShelf] && vm.notchState == .closed {
+        if Defaults[.boringShelf] && vm.notchState == .closed && !coordinator.isScreenLocked {
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
         .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $vm.dragDetectorTargeting) { providers in
+            guard !coordinator.isScreenLocked else { return false }
             vm.dropEvent = true
             ShelfStateViewModel.shared.load(providers)
             return true
@@ -1161,6 +1193,7 @@ struct ContentView: View {
     private func preferredTabForPointerLocation(
         _ mouseLocation: NSPoint = NSEvent.mouseLocation
     ) -> NotchViews? {
+        guard !coordinator.isScreenLocked else { return .home }
         guard enableAIUsageNotchTab,
               !coordinator.openLastTabByDefault,
               let screenFrame = getScreenFrame(vm.screenUUID) ?? NSScreen.main?.frame
@@ -1176,7 +1209,7 @@ struct ContentView: View {
         let offsetFromCenter = mouseLocation.x - (screenFrame.midX + centerShiftX)
 
         if offsetFromCenter < -centerHalfWidth {
-            return .home
+            return isShowingAIUsageClosedLiveActivity ? .aiUsage : .home
         }
         if offsetFromCenter > centerHalfWidth {
             return .aiUsage

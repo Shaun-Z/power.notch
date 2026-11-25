@@ -6,11 +6,30 @@
 //
 
 import Foundation
+import Security
 
 class ServiceDelegate: NSObject, NSXPCListenerDelegate {
     
     /// This method is where the NSXPCListener configures, accepts, and resumes a new incoming NSXPCConnection.
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
+        var ownCode: SecCode?
+        var staticCode: SecStaticCode?
+        var signingInfo: CFDictionary?
+        var teamID: String?
+        if SecCodeCopySelf([], &ownCode) == errSecSuccess, let ownCode,
+           SecCodeCopyStaticCode(ownCode, [], &staticCode) == errSecSuccess, let staticCode,
+           SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &signingInfo) == errSecSuccess {
+            teamID = (signingInfo as? [String: Any])?[kSecCodeInfoTeamIdentifier as String] as? String
+        }
+        if let teamID, !teamID.isEmpty {
+            newConnection.setCodeSigningRequirement("identifier \"com.powernotch.app\" and anchor apple generic and certificate leaf[subject.OU] = \"\(teamID)\"")
+        } else {
+            guard newConnection.effectiveUserIdentifier == getuid() else {
+                newConnection.invalidate()
+                return false
+            }
+            newConnection.setCodeSigningRequirement("identifier \"com.powernotch.app\"")
+        }
         
         // Configure the connection.
         // First, set the interface that the exported object implements.

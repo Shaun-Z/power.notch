@@ -9,6 +9,7 @@ import Foundation
 import Combine
 import SwiftUI
 
+@MainActor
 class AppleMusicController: MediaControllerProtocol {
     // MARK: - Properties
     @Published private var playbackState: PlaybackState = PlaybackState(
@@ -119,7 +120,7 @@ class AppleMusicController: MediaControllerProtocol {
         let script = """
         tell application \"Music\"
             try
-                set favorited of current track to " + (favorite ? "true" : "false") + "
+                set favorited of current track to \(favorite ? "true" : "false")
             end try
         end tell
         """

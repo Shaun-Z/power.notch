@@ -252,6 +252,8 @@ struct MusicControlsView: View {
             HoverButton(icon: "shuffle", iconColor: musicManager.isShuffled ? .red : .primary, scale: .medium) {
                 MusicManager.shared.toggleShuffle()
             }
+            .disabled(!musicManager.shuffleRepeatControlSupported)
+            .opacity(musicManager.shuffleRepeatControlSupported ? 1 : 0.35)
         case .previous:
             HoverButton(icon: "backward.fill", scale: .medium) {
                 MusicManager.shared.previousTrack()
@@ -268,6 +270,8 @@ struct MusicControlsView: View {
             HoverButton(icon: repeatIcon, iconColor: repeatIconColor, scale: .medium) {
                 MusicManager.shared.toggleRepeat()
             }
+            .disabled(!musicManager.shuffleRepeatControlSupported)
+            .opacity(musicManager.shuffleRepeatControlSupported ? 1 : 0.35)
         case .volume:
             VolumeControlView()
         case .favorite:
@@ -445,7 +449,7 @@ struct NotchHomeView: View {
     }
 
     private var shouldShowCamera: Bool {
-        Defaults[.showMirror] && webcamManager.cameraAvailable && vm.isCameraExpanded
+        !coordinator.isScreenLocked && Defaults[.showMirror] && webcamManager.cameraAvailable && vm.isCameraExpanded
     }
 
     private var mainContent: some View {
@@ -455,7 +459,7 @@ struct NotchHomeView: View {
                 maxArtWidth: (shouldShowCamera && Defaults[.showCalendar]) ? 136 : 154
             )
 
-            if Defaults[.showCalendar] {
+            if Defaults[.showCalendar] && !coordinator.isScreenLocked {
                 CalendarView()
                     .frame(width: shouldShowCamera ? 170 : 215)
                     .onHover { isHovering in

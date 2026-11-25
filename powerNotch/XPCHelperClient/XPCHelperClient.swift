@@ -1,5 +1,6 @@
 import Foundation
 import Cocoa
+import ApplicationServices
 import AsyncXPCConnection
 
 final class XPCHelperClient: NSObject {
@@ -10,6 +11,7 @@ final class XPCHelperClient: NSObject {
     private var remoteService: RemoteXPCService<PowerNotchXPCHelperProtocol>?
     private var connection: NSXPCConnection?
     private var lastKnownAuthorization: Bool?
+    private let monitoringLock = NSLock()
     private var monitoringTask: Task<Void, Never>?
     
     deinit {
@@ -72,12 +74,13 @@ final class XPCHelperClient: NSObject {
     // MARK: - Monitoring
     nonisolated func startMonitoringAccessibilityAuthorization(every interval: TimeInterval = 3.0) {
         // Ensure only one monitor exists
-        stopMonitoringAccessibilityAuthorization()
+        monitoringLock.lock()
+        defer { monitoringLock.unlock() }
+        monitoringTask?.cancel()
         monitoringTask = Task.detached { [weak self] in
-            guard let self = self else { return }
             while !Task.isCancelled {
                 // Call the helper method periodically which will notify on change
-                _ = await self.isAccessibilityAuthorized()
+                _ = await self?.isAccessibilityAuthorized()
                 do {
                     try await Task.sleep(for: .seconds(interval))
                 } catch { break }
@@ -86,66 +89,39 @@ final class XPCHelperClient: NSObject {
     }
 
     nonisolated func stopMonitoringAccessibilityAuthorization() {
+        monitoringLock.lock()
+        defer { monitoringLock.unlock() }
         monitoringTask?.cancel()
         monitoringTask = nil
     }
 
     // Expose whether the client is actively monitoring (useful for tests/debug)
     var isMonitoring: Bool {
+        monitoringLock.lock()
+        defer { monitoringLock.unlock() }
         return monitoringTask != nil
     }
     
     // MARK: - Accessibility
     
     nonisolated func requestAccessibilityAuthorization() {
-        Task {
-            let service = await MainActor.run {
-                ensureRemoteService()
-            }
-            try? await service.withService { service in
-                service.requestAccessibilityAuthorization()
-            }
-        }
+        Task { _ = await ensureAccessibilityAuthorization(promptIfNeeded: true) }
     }
-    
+
     nonisolated func isAccessibilityAuthorized() async -> Bool {
-        do {
-            let service = await MainActor.run {
-                ensureRemoteService()
-            }
-            let result: Bool = try await service.withContinuation { service, continuation in
-                service.isAccessibilityAuthorized { authorized in
-                    continuation.resume(returning: authorized)
-                }
-            }
-            await MainActor.run {
-                notifyAuthorizationChange(result)
-            }
-            return result
-        } catch {
-            return false
-        }
+        let result = AXIsProcessTrusted()
+        await notifyAuthorizationChange(result)
+        return result
     }
-    
+
     nonisolated func ensureAccessibilityAuthorization(promptIfNeeded: Bool) async -> Bool {
-        do {
-            let service = await MainActor.run {
-                ensureRemoteService()
-            }
-            let result: Bool = try await service.withContinuation { service, continuation in
-                service.ensureAccessibilityAuthorization(promptIfNeeded) { authorized in
-                    continuation.resume(returning: authorized)
-                }
-            }
-            await MainActor.run {
-                notifyAuthorizationChange(result)
-            }
-            return result
-        } catch {
-            return false
-        }
+        let result = promptIfNeeded
+            ? AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
+            : AXIsProcessTrusted()
+        await notifyAuthorizationChange(result)
+        return result
     }
-    
+
     // MARK: - Keyboard Brightness
     
     nonisolated func isKeyboardBrightnessAvailable() async -> Bool {

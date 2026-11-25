@@ -15,13 +15,17 @@ struct Bookmark: Sendable, Equatable, Codable {
         self.data = data
     }
 
+    private static var creationOptions: URL.BookmarkCreationOptions {
+        ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil ? .withSecurityScope : []
+    }
+
     init(url: URL) throws {
         guard url.isFileURL, FileManager.default.fileExists(atPath: url.path) else {
             throw NSError(domain: "Bookmark", code: 1, userInfo: [NSLocalizedDescriptionKey: "Not a valid file URL or file does not exist at \(url.path)"])
         }
         do {
             let bookmark = try url.bookmarkData(
-                options: .withSecurityScope,
+                options: Self.creationOptions,
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
@@ -37,15 +41,20 @@ struct Bookmark: Sendable, Equatable, Codable {
         guard !data.isEmpty else { return (nil, nil) }
         var isStale = false
         do {
-            let url = try URL(
-                resolvingBookmarkData: data,
-                options: [.withSecurityScope],
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            )
-            if isStale, let newData = try? url.bookmarkData(options: [.withSecurityScope]) {
-                NSLog("⚠️ Bookmark was stale for \(url.path), refreshed")
-                return (url, newData)
+            let url: URL
+            do {
+                url = try URL(resolvingBookmarkData: data, options: [.withoutUI], relativeTo: nil, bookmarkDataIsStale: &isStale)
+            } catch {
+                url = try URL(resolvingBookmarkData: data, options: [.withSecurityScope, .withoutUI], relativeTo: nil, bookmarkDataIsStale: &isStale)
+            }
+            if isStale {
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    return (url, try url.bookmarkData(options: Self.creationOptions))
+                } catch {
+                    NSLog("Failed to refresh stale bookmark: \(error.localizedDescription)")
+                }
             }
             return (url, nil)
         } catch {
