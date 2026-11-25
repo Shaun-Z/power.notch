@@ -1255,26 +1255,15 @@ struct ClosedNotchAIUsageSummaryView: View {
                     .shadow(color: ink.isClearGlass ? .clear : .black.opacity(0.65), radius: 1, x: 0, y: 1)
                     .shadow(color: ink.isClearGlass ? .clear : .black.opacity(0.40), radius: 2.5, x: 0, y: 0)
 
-                case .balance(let provider, _, let currencyBalance):
-                    HStack(spacing: 4) {
-                        Text(provider.shortName)
-                            .font(.system(size: textSize, weight: .semibold, design: .rounded))
-                            .foregroundStyle(ink.primary(0.86))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-
-                        Text("·")
-                            .font(.system(size: textSize, weight: .semibold))
-                            .foregroundStyle(ink.tertiary(0.38))
-
-                        Text(currencyBalance.formattedRemaining)
-                            .font(.system(size: textSize, weight: .bold, design: .monospaced))
-                            .foregroundStyle(ink.accent(provider.accentColor))
-                            .lineLimit(1)
-                    }
-                    .padding(.horizontal, 6)
-                    .shadow(color: ink.isClearGlass ? .clear : .black.opacity(0.65), radius: 1, x: 0, y: 1)
-                    .shadow(color: ink.isClearGlass ? .clear : .black.opacity(0.40), radius: 2.5, x: 0, y: 0)
+                case .balance(let provider, _, _):
+                    Text(provider.shortName)
+                        .font(.system(size: textSize, weight: .semibold, design: .rounded))
+                        .foregroundStyle(ink.primary(0.86))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .padding(.horizontal, 6)
+                        .shadow(color: ink.isClearGlass ? .clear : .black.opacity(0.65), radius: 1, x: 0, y: 1)
+                        .shadow(color: ink.isClearGlass ? .clear : .black.opacity(0.40), radius: 2.5, x: 0, y: 0)
                 }
             } else {
                 Text("AI Usage")
