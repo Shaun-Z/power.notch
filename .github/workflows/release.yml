@@ -313,19 +313,22 @@ jobs:
           test -x "$RUNNER_TEMP/generate_appcast" || {
             echo "::error::$RUNNER_TEMP/generate_appcast missing or not executable"; exit 1;
           }
+          # Keep the argument array nonempty: macOS Bash 3.2 treats an empty
+          # array as unset when nounset is enabled.
+          APPCAST_ARGS=(
+            --link "https://github.com/${GITHUB_REPOSITORY}/releases"
+            --download-url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/"
+            --embed-release-notes
+          )
           if [[ "$IS_BETA" == "true" ]]; then
             APPCAST_OUT="appcast-beta.xml"
-            CHANNEL_ARGS=(--channel "$BETA_CHANNEL_NAME")
+            APPCAST_ARGS+=(--channel "$BETA_CHANNEL_NAME")
           else
             APPCAST_OUT="appcast-stable.xml"
-            CHANNEL_ARGS=()
           fi
           printf '%s' "$SPARKLE_PRIVATE_KEY" | "$RUNNER_TEMP/generate_appcast" \
             --ed-key-file - \
-            --link "https://github.com/${GITHUB_REPOSITORY}/releases" \
-            --download-url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/" \
-            --embed-release-notes \
-            "${CHANNEL_ARGS[@]}" \
+            "${APPCAST_ARGS[@]}" \
             -o "$APPCAST_OUT" \
             Release/
 
