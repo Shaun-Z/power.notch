@@ -224,106 +224,11 @@ struct NotchUnifiedLyricOverlay: View {
 
         Group {
             if targetRect.width > 0 && targetRect.height > 0 {
-                TimelineView(.periodic(from: .now, by: 0.1)) { timeline in
-                    let line = currentLyricLine(at: timeline.date)
-                    let isPersian = containsPersianCharacters(line)
-                    let baseFontSize = NSFont.preferredFont(forTextStyle: .subheadline).pointSize
-                    let adaptiveFontSize: CGFloat = (!isOpen && isClosedInlineInNotch && targetRect.height > 0 && targetRect.height < 20)
-                        ? max(8.5, targetRect.height * 0.56)
-                        : baseFontSize
-                    let font: Font = isPersian
-                        ? .custom("Vazirmatn-Regular", size: adaptiveFontSize)
-                        : .system(size: adaptiveFontSize)
-                    let activeContainerWidth = targetRect.width
-                    let isOverflowing = measuredTextWidth > activeContainerWidth + 2
-                    let needsInlineMarquee = isInlineOpen && isOverflowing
-                    let needsClosedScroll = !isInlineOpen && isOverflowing
-
-                    NotchLyricFlightView(
-                        rect: targetRect,
-                        inlineProgress: targetInlineProgress,
-                        measuredTextWidth: measuredTextWidth,
-                        needsInlineMarquee: needsInlineMarquee,
-                        needsClosedScroll: needsClosedScroll,
-                        scrollPhase: scrollPhase,
-                        marqueeOffset: marqueeOffset
-                    ) {
-                        ZStack(alignment: .leading) {
-                            lyricTextView(line: line, font: font, needsMarquee: isOverflowing)
-                                .overlay(alignment: .leading) {
-                                    if needsInlineMarquee {
-                                        lyricTextView(line: line, font: font, needsMarquee: true)
-                                            .offset(x: measuredTextWidth + 24)
-                                    }
-                                }
-                        }
-                    }
-                    .animation(flightAnim, value: targetRect)
-                    .animation(flightAnim, value: targetInlineProgress)
-                    .background {
-                        // Measure single-line natural width without affecting layout
-                        Text(line)
-                            .font(font)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .hidden()
-                            .background {
-                                GeometryReader { textGeo in
-                                    Color.clear
-                                        .onAppear {
-                                            updateMeasuredWidth(
-                                                textGeo.size.width,
-                                                line: line,
-                                                containerWidth: activeContainerWidth,
-                                                at: timeline.date
-                                            )
-                                        }
-                                        .onChange(of: textGeo.size.width) { _, newWidth in
-                                            updateMeasuredWidth(
-                                                newWidth,
-                                                line: line,
-                                                containerWidth: activeContainerWidth,
-                                                at: timeline.date
-                                            )
-                                        }
-                                        .onChange(of: line) { _, newLine in
-                                            updateMeasuredWidth(
-                                                textGeo.size.width,
-                                                line: newLine,
-                                                containerWidth: activeContainerWidth,
-                                                at: timeline.date
-                                            )
-                                        }
-                                        .onChange(of: displayMode) { _, _ in
-                                            updateMeasuredWidth(
-                                                textGeo.size.width,
-                                                line: line,
-                                                containerWidth: activeContainerWidth,
-                                                at: timeline.date
-                                            )
-                                        }
-                                        .onChange(of: activeContainerWidth) { oldWidth, newWidth in
-                                            guard abs(newWidth - oldWidth) > 0.5 else { return }
-                                            updateMeasuredWidth(
-                                                textGeo.size.width,
-                                                line: line,
-                                                containerWidth: newWidth,
-                                                at: timeline.date
-                                            )
-                                        }
-                                        .onChange(of: isVisible) { _, visible in
-                                            guard visible else { return }
-                                            updateMeasuredWidth(
-                                                textGeo.size.width,
-                                                line: line,
-                                                containerWidth: activeContainerWidth,
-                                                at: timeline.date
-                                            )
-                                        }
-                                }
-                            }
-                    }
-                }
+                lyricFlightTimeline(
+                    targetRect: targetRect,
+                    targetInlineProgress: targetInlineProgress,
+                    flightAnimation: flightAnim
+                )
                 .animation(.easeInOut(duration: 0.18)) { view in
                     view.opacity(
                         isVisible
@@ -409,6 +314,113 @@ struct NotchUnifiedLyricOverlay: View {
             }
         }
         .allowsHitTesting(false)
+    }
+
+    private func lyricFlightTimeline(
+        targetRect: CGRect,
+        targetInlineProgress: CGFloat,
+        flightAnimation: Animation?
+    ) -> some View {
+        TimelineView(.periodic(from: .now, by: 0.1)) { timeline in
+            let line = currentLyricLine(at: timeline.date)
+            let isPersian = containsPersianCharacters(line)
+            let baseFontSize = NSFont.preferredFont(forTextStyle: .subheadline).pointSize
+            let adaptiveFontSize: CGFloat = (!isOpen && isClosedInlineInNotch && targetRect.height > 0 && targetRect.height < 20)
+                ? max(8.5, targetRect.height * 0.56)
+                : baseFontSize
+            let font: Font = isPersian
+                ? .custom("Vazirmatn-Regular", size: adaptiveFontSize)
+                : .system(size: adaptiveFontSize)
+            let activeContainerWidth = targetRect.width
+            let isOverflowing = measuredTextWidth > activeContainerWidth + 2
+            let needsInlineMarquee = isInlineOpen && isOverflowing
+            let needsClosedScroll = !isInlineOpen && isOverflowing
+
+            NotchLyricFlightView(
+                rect: targetRect,
+                inlineProgress: targetInlineProgress,
+                measuredTextWidth: measuredTextWidth,
+                needsInlineMarquee: needsInlineMarquee,
+                needsClosedScroll: needsClosedScroll,
+                scrollPhase: scrollPhase,
+                marqueeOffset: marqueeOffset
+            ) {
+                ZStack(alignment: .leading) {
+                    lyricTextView(line: line, font: font, needsMarquee: isOverflowing)
+                        .overlay(alignment: .leading) {
+                            if needsInlineMarquee {
+                                lyricTextView(line: line, font: font, needsMarquee: true)
+                                    .offset(x: measuredTextWidth + 24)
+                            }
+                        }
+                }
+            }
+            .animation(flightAnimation, value: targetRect)
+            .animation(flightAnimation, value: targetInlineProgress)
+            .background {
+                // Measure single-line natural width without affecting layout
+                Text(line)
+                    .font(font)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .hidden()
+                    .background {
+                        GeometryReader { textGeo in
+                            Color.clear
+                                .onAppear {
+                                    updateMeasuredWidth(
+                                        textGeo.size.width,
+                                        line: line,
+                                        containerWidth: activeContainerWidth,
+                                        at: timeline.date
+                                    )
+                                }
+                                .onChange(of: textGeo.size.width) { _, newWidth in
+                                    updateMeasuredWidth(
+                                        newWidth,
+                                        line: line,
+                                        containerWidth: activeContainerWidth,
+                                        at: timeline.date
+                                    )
+                                }
+                                .onChange(of: line) { _, newLine in
+                                    updateMeasuredWidth(
+                                        textGeo.size.width,
+                                        line: newLine,
+                                        containerWidth: activeContainerWidth,
+                                        at: timeline.date
+                                    )
+                                }
+                                .onChange(of: displayMode) { _, _ in
+                                    updateMeasuredWidth(
+                                        textGeo.size.width,
+                                        line: line,
+                                        containerWidth: activeContainerWidth,
+                                        at: timeline.date
+                                    )
+                                }
+                                .onChange(of: activeContainerWidth) { oldWidth, newWidth in
+                                    guard abs(newWidth - oldWidth) > 0.5 else { return }
+                                    updateMeasuredWidth(
+                                        textGeo.size.width,
+                                        line: line,
+                                        containerWidth: newWidth,
+                                        at: timeline.date
+                                    )
+                                }
+                                .onChange(of: isVisible) { _, visible in
+                                    guard visible else { return }
+                                    updateMeasuredWidth(
+                                        textGeo.size.width,
+                                        line: line,
+                                        containerWidth: activeContainerWidth,
+                                        at: timeline.date
+                                    )
+                                }
+                        }
+                    }
+            }
+        }
     }
 
     private func beginTransitionWindow(duration: Double? = nil) {
