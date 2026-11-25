@@ -34,6 +34,8 @@ jobs:
     - name: Code Checkout
       # TODO: pin to immutable SHA
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: Release pipeline regression tests
+      run: python3 -m unittest discover -s .github/scripts/tests -v
     - name: AI usage regression tests
       env:
         DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
