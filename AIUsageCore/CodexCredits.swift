@@ -101,19 +101,38 @@ enum AIUsageCodexCredits {
         return calendar.date(byAdding: .month, value: 1, to: monthStart)
     }
 
-    /// The spend-control route, addressed from the same API base the usage route was read from.
+    /// The spend-control route, addressed from the same host the usage route was read from.
+    ///
+    /// The account id travels in the path, so this refuses anything but `https` and builds the
+    /// request with `URLComponents` instead of concatenating a scheme from the caller's base.
     static func monthlyUsageURL(base: String, accountID: String) -> URL? {
         let id = accountID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !id.isEmpty else { return nil }
 
-        var root = base.trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard !root.isEmpty else { return nil }
-        for suffix in ["/wham/usage", "/backend-api"] where root.hasSuffix(suffix) {
-            root.removeLast(suffix.count)
-        }
-        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
-        return URL(string: "\(root)/backend-api/accounts/\(encoded)/spend-controls/current-user/monthly-usage")
+        guard var components = URLComponents(string: base.trimmingCharacters(in: .whitespacesAndNewlines)),
+              components.scheme?.lowercased() == "https",
+              let host = components.host,
+              !host.isEmpty
+        else { return nil }
+
+        components.scheme = "https"
+        components.user = nil
+        components.password = nil
+        components.query = nil
+        components.fragment = nil
+        components.percentEncodedPath =
+            "/backend-api/accounts/\(percentEncodedPathSegment(id))/spend-controls/current-user/monthly-usage"
+
+        let url = components.url
+        guard url?.scheme?.lowercased() == "https" else { return nil }
+        return url
+    }
+
+    /// Percent-encodes one path segment, so an id can never add a segment of its own.
+    private static func percentEncodedPathSegment(_ value: String) -> String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
     }
 
     private static func number(_ any: Any?) -> Double? {

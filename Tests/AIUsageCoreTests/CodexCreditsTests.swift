@@ -171,5 +171,13 @@ struct CodexCreditsTests {
         )
         #expect(AIUsageCodexCredits.monthlyUsageURL(base: "https://chatgpt.com/backend-api", accountID: "  ") == nil)
         #expect(AIUsageCodexCredits.monthlyUsageURL(base: " ", accountID: "acct-1") == nil)
+        // The account id travels in the path: never build this request over cleartext.
+        #expect(AIUsageCodexCredits.monthlyUsageURL(base: "http://chatgpt.com/backend-api", accountID: "acct-1") == nil)
+        #expect(AIUsageCodexCredits.monthlyUsageURL(base: "chatgpt.com/backend-api", accountID: "acct-1") == nil)
+        // An id can never add a path segment of its own.
+        #expect(
+            AIUsageCodexCredits.monthlyUsageURL(base: "https://chatgpt.com/backend-api", accountID: "a/../b")?
+                .absoluteString == "https://chatgpt.com/backend-api/accounts/a%2F..%2Fb/spend-controls/current-user/monthly-usage"
+        )
     }
 }
