@@ -41,7 +41,7 @@ Say hello to **powerNotch** — turning your Mac's notch or Dynamic Island into 
 - **Customizable Gestures & Sizing** — Fine-tune notch dimensions and interactions for different display sizes.
 - **Liquid Glass & Dynamic Island** — Per-display Notch/Dynamic Island modes, Follow system/Light/Dark/Custom glass colors, and an app-specific opacity control. Native Liquid Glass requires macOS 26 or later; earlier versions use a blur material fallback.
 - **Physical Notch Blending** — A black collapsed surface and soft shading blend the expanded glass card into your Mac's physical notch.
-- **AI Usage & Desktop Widgets** — Optional provider quota, balance, and usage-history views, with desktop widgets. Available readings depend on the provider, credentials, and local history; the notch tab is disabled by default.
+- **AI Usage & Desktop Widgets** — Optional monitoring for OpenAI Codex, Claude Code, Antigravity, GitHub Copilot, Cursor, OpenCode, Xiaomi MiMo, OpenRouter, DeepSeek, z.ai/GLM, and Kimi/Moonshot: session and weekly limits as concentric rings, a monthly credit allowance as its own ring, top-up balances as plain amounts, one reading pinnable beside the closed notch, and desktop widgets with a 24-hour / 7-day / 30-day trend for tokens, spend, or requests. Readings depend on the provider, credentials, and local history; the notch tab is disabled by default.
 - **Developer Options** — Unlock animation speed controls and per-display Dynamic Island position and height adjustments by clicking the version number five times in About.
 
 ## Installation
@@ -52,22 +52,27 @@ Say hello to **powerNotch** — turning your Mac's notch or Dynamic Island into 
 - Apple Silicon or Intel Mac
 - macOS **26 or later** for native Liquid Glass
 
-### Option 1: Download from Releases
-
-Download the latest `.dmg` from the [Releases](https://github.com/Shaun-Z/power.notch/releases) page, open it, and drag **powerNotch.app** into `/Applications`.
-
-> [!IMPORTANT]
-> The app has not been notarized by Apple. After moving the app to `/Applications` and attempting to open it, you may need to open **System Settings → Privacy & Security** and choose **Open Anyway**. Homebrew installs the same app and does not remove this first-launch requirement.
->
-> Version **0.1.1** adds a read-only snapshot fallback for desktop widgets in ad-hoc builds. Version 0.1.0 does not support widget data sharing; AI usage monitoring inside that app remains available.
-
-### Option 2: Homebrew
-
-Install from [Shaun-Z/homebrew-tap](https://github.com/Shaun-Z/homebrew-tap):
+### Option 1: Homebrew (recommended)
 
 ```bash
 brew install --cask Shaun-Z/tap/power-notch
 ```
+
+The cask comes from [Shaun-Z/homebrew-tap](https://github.com/Shaun-Z/homebrew-tap). It installs **powerNotch.app** into `/Applications` and then removes the quarantine attribute from the installed copy (`xattr -dr com.apple.quarantine`).
+
+> [!IMPORTANT]
+> That postflight step clears the `com.apple.quarantine` flag, so macOS **skips its normal first-launch check** and the app starts without an "Open Anyway" step. This is a convenience, not a security guarantee: it does **not** mean powerNotch has been notarized, signed by a Developer ID, or vetted by Apple. The app is distributed ad-hoc signed, exactly as described below, and you remain the one deciding whether to trust it.
+>
+> If you would rather keep the standard first-launch check, use Option 2 instead — Homebrew only removes quarantine for copies it installs itself.
+
+### Option 2: Download from Releases
+
+Download the latest `.dmg` from the [Releases](https://github.com/Shaun-Z/power.notch/releases) page, open it, and drag **powerNotch.app** into `/Applications`.
+
+> [!IMPORTANT]
+> The app has not been notarized by Apple, and the DMG download keeps the quarantine attribute. The first launch therefore needs **System Settings → Privacy & Security → Open Anyway** (or, if you prefer the command line, `xattr -dr com.apple.quarantine /Applications/powerNotch.app`).
+>
+> Version **0.1.1** adds a read-only snapshot fallback for desktop widgets in ad-hoc builds. Version 0.1.0 does not support widget data sharing; AI usage monitoring inside that app remains available.
 
 ## Usage
 
@@ -75,11 +80,21 @@ brew install --cask Shaun-Z/tap/power-notch
 - Hover over or click the notch to expand controls, calendar, and shelf.
 - Use the menu bar icon to open Settings and customize appearance, media controllers, lyrics, HUDs, and gestures.
 
+### AI Usage
+
+Open **Settings → AI Usage** and enable the providers you use. Credentials are read from the CLIs already signed in on your Mac (`~/.codex`, `~/.claude`, `~/.gemini`, `~/.local/share/opencode`, Cursor's session, or a GitHub Copilot device login), or from a key you paste in Settings. External Keychain reads (Claude Code) are off by default and only happen on a manual refresh.
+
+- Session and weekly limits render as concentric rings. A credit allowance that states a monthly ceiling — an education or workspace Codex account, for example — renders as its own ring next to them, while an uncapped prepaid balance or a pay-as-you-go wallet stays a plain amount.
+- Click a ring, or a balance badge, to pin that reading beside the closed notch. The AI Usage tab in the expanded notch is off by default; enable it in Settings.
+- Desktop widgets offer small, medium, and large layouts with per-provider pages. The large layout adds a **24-hour / 7-day / 30-day** trend for tokens, spend, or requests.
+- Spend follows the account's own currency. A history that mixes currencies is converted with cached daily USD rates, and real wallet movement is preferred to the log-based estimate for the same day.
+- History is only as complete as what the Mac can see: provider APIs report current quotas, while daily spend comes from local CLI logs and from balance changes observed while the app runs. Days before first use, or while powerNotch was closed, stay empty rather than being estimated.
+
 ### Desktop widgets in ad-hoc builds
 
 The app and widget prefer the team-prefixed App Group when configured. Builds signed by `.github/scripts/sign_adhoc.py` remove the provisioned group and share a snapshot at `~/Library/Application Support/powerNotch/widget/ai-usage-widget-state.json` instead. Only the app writes this file; the sandboxed widget has a read-only exception for that specific directory. It contains display data, never API keys or OAuth tokens. The directory is created with owner-only access.
 
-Provider-page and chart-metric selections use the widget's own preferences when no App Group is configured. The last snapshot remains readable after the app quits; fetching new usage with the refresh button requires the app to be running. No local HTTP server is used.
+Provider-page, chart-metric, and trend-range selections use the widget's own preferences when no App Group is configured. The last snapshot remains readable after the app quits; fetching new usage with the refresh button requires the app to be running. No local HTTP server is used.
 
 Ad-hoc signing and file access do not guarantee WidgetKit registration, rendering, or AppIntent button delivery on every macOS release. Those behaviors need testing with the installed distribution build; upgrades may require re-adding the widget. Version 0.1.0 retains the data-sharing limitation noted above.
 
