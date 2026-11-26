@@ -21,6 +21,7 @@ enum AIUsageWidgetSync {
         enabledProviders: [AIProviderID],
         snapshots: [AIProviderID: AIProviderSnapshot],
         dailyHistories: [AIProviderID: [AIUsageWidgetDailyPoint]] = [:],
+        hourlyHistories: [AIProviderID: [AIUsageWidgetDailyPoint]] = [:],
         showRemainingPercent: Bool,
         hideAccountEmails: Bool
     ) {
@@ -66,12 +67,14 @@ enum AIUsageWidgetSync {
                     periodLabel: bal.periodLabel,
                     formattedRemaining: bal.formattedRemaining,
                     compactFormattedRemaining: bal.compactFormattedRemaining,
-                    formattedBreakdown: bal.formattedBreakdown
+                    formattedBreakdown: bal.formattedBreakdown(showRemaining: showRemainingPercent)
                 )
             }
 
             let history = dailyHistories[provider] ?? []
-            let currencySymbol = history.compactMap(\.selectedCost).first?.chartCurrencyPrefix ?? ""
+            let hourlyHistory = hourlyHistories[provider] ?? []
+            // One axis for both windows, so switching 30D -> 1D never changes the currency.
+            let currencySymbol = (history + hourlyHistory).compactMap(\.selectedCost).first?.chartCurrencyPrefix ?? ""
 
             return AIUsageWidgetProviderPage(
                 id: provider.rawValue,
@@ -94,6 +97,7 @@ enum AIUsageWidgetSync {
                 ringGroups: groups,
                 balance: widgetBalance,
                 dailyHistory: history,
+                hourlyHistory: hourlyHistory,
                 costCurrencySymbol: currencySymbol
             )
         }

@@ -198,6 +198,37 @@ private struct AIUsageOverviewRow: View {
     let onRefresh: () -> Void
     let onConfigure: () -> Void
 
+    /// Source (`codex-oauth`, `agy-cli`, …) stacked over the account: in a row that already
+    /// carries the name, the plan badge and the actions, two narrow lines cost less width than
+    /// one long run of monospaced text.
+    @ViewBuilder
+    private var identityColumn: some View {
+        let source = (snapshot?.sourceLabel ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let account = hideEmails
+            ? ""
+            : (snapshot?.accountLabel ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if !source.isEmpty || !account.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                if !source.isEmpty {
+                    Text(source)
+                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                if !account.isEmpty {
+                    Text(account)
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .layoutPriority(-1)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Top bar: Icon + Provider Name + Plan Badge + Account + Actions
@@ -227,25 +258,15 @@ private struct AIUsageOverviewRow: View {
                         .lineLimit(1)
                 }
 
-                if let src = snapshot?.sourceLabel, !src.isEmpty {
-                    Text(src)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                if !hideEmails, let acct = snapshot?.accountLabel, !acct.isEmpty {
-                    Text("· \(acct)")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
+                identityColumn
 
                 Spacer(minLength: 4)
 
-                // If provider has both windows AND a balance, show compact balance on right
-                if let snapshot, !snapshot.windows.isEmpty, let balance = snapshot.balance {
+                // If provider has both windows AND a balance the card body already lines the
+                // balance up under the rings; showing it in the header too just says it twice.
+                if let snapshot, !snapshot.windows.isEmpty, let balance = snapshot.balance,
+                   balance.settingsSummaryLine(showRemaining: showRemaining) == nil
+                {
                     Text(balance.formattedRemaining)
                         .font(.system(size: 11.5, weight: .bold, design: .monospaced))
                         .foregroundStyle(.primary)
@@ -285,7 +306,7 @@ private struct AIUsageOverviewRow: View {
                             ringGroupRow(group)
                         }
                     }
-                    if let breakdown = snapshot.balance?.formattedBreakdown {
+                    if let breakdown = snapshot.balance?.settingsSummaryLine(showRemaining: showRemaining) {
                         Text(breakdown)
                             .font(.system(size: 10.5))
                             .foregroundStyle(.secondary)
@@ -301,7 +322,7 @@ private struct AIUsageOverviewRow: View {
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text(balance.formattedRemaining)
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
-                        if let secondary = balance.formattedBreakdown {
+                        if let secondary = balance.settingsSummaryLine(showRemaining: showRemaining) {
                             Text(secondary)
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
@@ -374,6 +395,9 @@ private struct AIUsageOverviewRow: View {
                     outerTrackColor: Color.primary.opacity(0.11),
                     innerTrackColor: Color.primary.opacity(0.09)
                 )
+                // One gauge column width for every group, so the reading/reset columns below stay
+                // aligned between a dual-ring pool and a single-ring one.
+                .frame(width: 38, height: 38)
 
                 VStack(alignment: .leading, spacing: 4) {
                     windowTextLine(
@@ -401,6 +425,7 @@ private struct AIUsageOverviewRow: View {
                     trackColor: Color.primary.opacity(0.11),
                     labelColor: .primary
                 )
+                .frame(width: 38, height: 38)
 
                 windowTextLine(
                     group.outerWindow,
@@ -412,6 +437,11 @@ private struct AIUsageOverviewRow: View {
         }
     }
 
+    /// Reading and countdown live in two fixed columns so they line up down the whole provider,
+    /// even when one pool needs two lines of text.
+    private static let percentageColumnWidth: CGFloat = 66
+    private static let resetColumnWidth: CGFloat = 106
+
     @ViewBuilder
     private func windowTextLine(
         _ window: AIUsageRateWindow,
@@ -419,34 +449,50 @@ private struct AIUsageOverviewRow: View {
         indicatorColor: Color,
         ringHint: String?
     ) -> some View {
-        HStack(spacing: 6) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             if ringHint != nil {
                 Circle()
                     .fill(indicatorColor)
                     .frame(width: 6, height: 6)
+                    .alignmentGuide(.firstTextBaseline) { dimensions in
+                        dimensions[VerticalAlignment.center] + 3.5
+                    }
             }
 
-            Text(window.label)
-                .font(.system(size: 11.5, weight: .medium))
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(window.label)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .lineLimit(1)
+
+                // The used/limit figure belongs to the pool above it, not to the right-hand
+                // columns, so it stacks under the name.
+                if let detail = window.detailText {
+                    Text(detail)
+                        .font(.system(size: 9.5, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
 
             Spacer(minLength: 6)
 
-            if let detail = window.detailText {
-                Text(detail)
-                    .font(.system(size: 10.5, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            if let reset = window.resetCountdownText {
-                Text("resets in \(reset)")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
             Text(String(format: "%.0f%% %@", displayPct, showRemaining ? "left" : "used"))
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundStyle(indicatorColor)
+                .lineLimit(1)
+                .frame(width: Self.percentageColumnWidth, alignment: .trailing)
+
+            Group {
+                if let reset = window.resetSummaryText {
+                    Text(reset)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else {
+                    Color.clear.frame(height: 0)
+                }
+            }
+            .frame(width: Self.resetColumnWidth, alignment: .trailing)
         }
     }
 }

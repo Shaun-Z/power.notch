@@ -415,6 +415,8 @@ struct AIUsageRingGroup: Identifiable {
             return "Chat"
         case "Plan Included", "Token Plan Quota":
             return "Plan"
+        case "Monthly Credits":
+            return "Credits"
         case "Key Cap":
             return "Cap"
         case "MCP Quota":
@@ -599,7 +601,11 @@ struct AIUsageRateWindow: Identifiable, Codable, Equatable, Sendable {
     var resetCountdownText: String? {
         guard let resetAt else { return nil }
         let remaining = resetAt.timeIntervalSinceNow
-        guard remaining > 0 else { return "Resetting" }
+        guard remaining > 0 else {
+            // A reset far in the past is a missing or malformed timestamp from the provider, not a
+            // window that just rolled over: say nothing rather than "resets in Resetting".
+            return remaining > -Self.staleResetGrace ? "Resetting" : nil
+        }
         let totalMinutes = Int(remaining / 60)
         let days = totalMinutes / (60 * 24)
         let hours = (totalMinutes % (60 * 24)) / 60
@@ -614,10 +620,22 @@ struct AIUsageRateWindow: Identifiable, Codable, Equatable, Sendable {
         }
     }
 
+    /// A window whose reset instant is this far behind is treated as having no reset information.
+    private static let staleResetGrace: TimeInterval = 24 * 3600
+
+    /// A ready-to-display countdown: "resets in 33m", or just "Resetting" once the window has
+    /// already reset — "resets in Resetting" is not a sentence.
+    var resetSummaryText: String? {
+        guard let countdown = resetCountdownText else { return nil }
+        return countdown == "Resetting" ? "Resetting" : "resets in \(countdown)"
+    }
+
     var compactResetCountdownText: String? {
         guard let resetAt else { return nil }
         let remaining = resetAt.timeIntervalSinceNow
-        guard remaining > 0 else { return "Now" }
+        guard remaining > 0 else {
+            return remaining > -Self.staleResetGrace ? "Now" : nil
+        }
         let totalMinutes = Int(remaining / 60)
         let days = totalMinutes / (60 * 24)
         let hours = (totalMinutes % (60 * 24)) / 60
@@ -726,7 +744,9 @@ struct AIUsageBalance: Codable, Equatable, Sendable {
         }.joined(separator: " · ")
     }
 
-    var formattedBreakdown: String? {
+    /// Paid/gift split plus what is left (or used) against the ceiling. `showRemaining` mirrors the
+    /// settings toggle, so the balance line and the quota percentages always speak the same mode.
+    func formattedBreakdown(showRemaining: Bool = false) -> String? {
         var parts: [String] = []
         let all = allCurrencyBalances
         if all.count > 1 {
@@ -740,7 +760,11 @@ struct AIUsageBalance: Codable, Equatable, Sendable {
             parts.append("Paid \(Self.formatAmount(toppedUp, currency: currency))")
             parts.append("Gift \(Self.formatAmount(granted, currency: currency))")
         }
-        if let usedThisPeriod {
+        if showRemaining, let remaining, let limit, limit > 0 {
+            parts.append(
+                "\(periodLabel ?? "Balance"): \(Self.formatAmount(remaining, currency: currency)) left of \(Self.formatAmount(limit, currency: currency))"
+            )
+        } else if let usedThisPeriod {
             let label = periodLabel ?? "Used"
             if let limit, limit > 0 {
                 parts.append("\(label): \(Self.formatAmount(usedThisPeriod, currency: currency)) / \(Self.formatAmount(limit, currency: currency))")
@@ -751,6 +775,37 @@ struct AIUsageBalance: Codable, Equatable, Sendable {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
+    /// A settings row reads a ceiling without a unit on every number:
+    /// `Monthly credits left: 548/8000` or `Monthly credits used: 7452/8000`. Money balances keep
+    /// their currency symbol and the shared breakdown wording.
+    func settingsSummaryLine(showRemaining: Bool) -> String? {
+        guard AIUsageCost.isCreditUnit(currency) else {
+            return formattedBreakdown(showRemaining: showRemaining)
+        }
+
+        let label = periodLabel ?? "Credits"
+        if let limit, limit > 0 {
+            let shown: Double? = showRemaining
+                ? (remaining ?? usedThisPeriod.map { max(0, limit - $0) })
+                : usedThisPeriod
+            if let shown {
+                return "\(label) \(showRemaining ? "left" : "used"): \(Self.plainAmount(shown))/\(Self.plainAmount(limit))"
+            }
+            return nil
+        }
+        if showRemaining, let remaining {
+            return "\(label) left: \(Self.plainAmount(remaining))"
+        }
+        if let usedThisPeriod {
+            return "\(label) used: \(Self.plainAmount(usedThisPeriod))"
+        }
+        return nil
+    }
+
+    private static func plainAmount(_ value: Double) -> String {
+        String(format: "%.0f", value)
+    }
+
     static func formatAmount(_ value: Double, currency: String) -> String {
         let upper = currency.uppercased()
         let symbol: String
@@ -759,14 +814,10 @@ struct AIUsageBalance: Codable, Equatable, Sendable {
         case "USD": symbol = "$"
         case "EUR": symbol = "€"
         case "CREDITS", "PTS":
-            if value >= 1_000_000_000 {
-                return String(format: "%.2fB credits", value / 1_000_000_000)
-            } else if value >= 1_000_000 {
-                return String(format: "%.2fM credits", value / 1_000_000)
-            } else if value >= 1_000 {
-                return String(format: "%.1fK credits", value / 1_000)
-            }
-            return String(format: "%.0f credits", value)
+            // Credits are counted, not measured: a ceiling of 8000 stays "8000", because "8.0K"
+            // hides the number people compare against their balance.
+            let unit = upper == "PTS" ? "pts" : "cr"
+            return String(format: "%.0f %@", value, unit)
         case "TOKENS", "TOK":
             if value >= 1_000_000_000 {
                 return String(format: "%.2fB tok", value / 1_000_000_000)

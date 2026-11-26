@@ -273,7 +273,7 @@ struct AIUsageWidgetContractTests {
 
     @Test("Shared schema version constant is 3 and drives the sample payload")
     func schemaVersionIsThree() {
-        #expect(AIUsageWidgetSharedConstants.currentSchemaVersion == 3)
+        #expect(AIUsageWidgetSharedConstants.currentSchemaVersion == 4)
         #expect(AIUsageWidgetPayload.sample.schemaVersion == AIUsageWidgetSharedConstants.currentSchemaVersion)
     }
 
@@ -289,7 +289,7 @@ struct AIUsageWidgetContractTests {
             AIUsageWidgetPayload.self,
             from: try makeEncoder().encode(firstWireForm)
         )
-        #expect(firstWireForm.schemaVersion == 3)
+        #expect(firstWireForm.schemaVersion == 4)
         #expect(firstWireForm.providers.count == AIUsageWidgetPayload.sample.providers.count)
         #expect(firstWireForm.providers.map(\.id) == AIUsageWidgetPayload.sample.providers.map(\.id))
         #expect(firstWireForm.providers == secondWireForm.providers)

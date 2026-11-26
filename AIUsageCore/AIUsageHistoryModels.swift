@@ -34,12 +34,25 @@ struct AIUsageCost: Codable, Sendable, Equatable {
         case "JPY": return "JP¥"
         case "EUR": return "€"
         case "GBP": return "£"
+        // Allowances counted in credits/tokens read as a unit, not as a currency code.
+        case "CREDITS", "PTS": return "cr "
+        case "TOKENS", "TOK": return "tok "
         default: return currency + " "
         }
     }
 
     var chartCurrencyPrefix: String {
         source == .localEstimate ? "≈" + currencySymbol : currencySymbol
+    }
+
+    /// A credit or token allowance is quota, not money. A subscription that also reports an
+    /// API-equivalent estimate keeps its money chart; the allowance only wins when the provider
+    /// has nothing else to plot.
+    static func isCreditUnit(_ currency: String) -> Bool {
+        switch normalizedCurrency(currency) {
+        case "CREDITS", "PTS", "TOKENS", "TOK": return true
+        default: return false
+        }
     }
 }
 
@@ -81,6 +94,21 @@ struct AIUsageLedgerEntry: Codable, Sendable {
         } else {
             costs.append(AIUsageCost(amount: amount, currency: currency, source: .balanceDelta))
         }
+    }
+
+    /// Before the ledger tracked currency, the very same balance delta was written to a bare
+    /// `cost` field. The currency is not in the file, but a provider whose recorded deltas all
+    /// share one currency cannot have billed those older days in another one, so they can be
+    /// attributed instead of staying blank. With no single currency to point at, the amount stays
+    /// unattributed rather than guessed.
+    func attributedCosts(legacyCurrency: String?) -> [AIUsageCost] {
+        guard costs.isEmpty,
+              let legacy = legacyUnattributedCost,
+              legacy.isFinite, legacy > 0,
+              let currency = legacyCurrency?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !currency.isEmpty
+        else { return costs }
+        return [AIUsageCost(amount: legacy, currency: currency, source: .balanceDelta)]
     }
 }
 
@@ -133,7 +161,12 @@ struct AIUsageWidgetDailyPoint: Codable, Identifiable, Sendable, Equatable {
         try values.encode(cost, forKey: .cost)
     }
 
+    /// `"11/23"` for a day bucket, `"14:00"` for an hour bucket (`"2026-11-23T14"`).
     var shortDateLabel: String {
+        if let separator = dayKey.firstIndex(of: "T") {
+            let hour = dayKey[dayKey.index(after: separator)...]
+            return "\(hour):00"
+        }
         let parts = dayKey.split(separator: "-")
         if parts.count == 3, let month = Int(parts[1]), let day = Int(parts[2]) {
             return "\(month)/\(day)"
@@ -143,29 +176,124 @@ struct AIUsageWidgetDailyPoint: Codable, Identifiable, Sendable, Equatable {
 }
 
 enum AIUsageCostSeries {
-    /// Use one source and currency for the entire chart. Never add, compare, or convert
-    /// balance-derived spend and API-equivalent estimates, even in the same currency.
-    static func select(_ points: [AIUsageWidgetDailyPoint], preferredCurrency: String?) -> [AIUsageWidgetDailyPoint] {
+    /// Turns the per-day cost entries of one provider into the single spend series a chart plots.
+    ///
+    /// - The series is *complete*: every bucket gets the best number the account has for it, so a
+    ///   wallet that was only sampled while the app ran still shows the days it spent.
+    /// - Real wallet movement wins over the usage-log proxy on the same day — a balance drop is
+    ///   money that actually left the account, while a token log is an API-equivalent estimate.
+    ///   They are never added together.
+    /// - A provider that reports a money wallet (MiMo/DeepSeek in CNY, OpenRouter in USD) charts
+    ///   in that currency; anything else — typically a USD estimate — is converted into it.
+    /// - Without a money wallet, a history in a single currency is plotted as reported, and a
+    ///   history that mixes currencies is unified in USD — and only when one of them *is* USD.
+    /// - A credit or token allowance is never converted: it is a quota, not money, and it only
+    ///   becomes the series when the provider reports no money at all.
+    static func select(
+        _ points: [AIUsageWidgetDailyPoint],
+        preferredCurrency: String?,
+        rates: AIUsageCurrencyRates = .fallback
+    ) -> [AIUsageWidgetDailyPoint] {
         let costs = points.flatMap(\.costs).filter { $0.amount > 0 }
         let preferred = preferredCurrency.map(AIUsageCost.normalizedCurrency)
-        let balanceCosts = costs.filter { $0.source == .balanceDelta }.sorted { $0.currency < $1.currency }
-        let selection = balanceCosts.first(where: { $0.currency == preferred })
-            ?? balanceCosts.first
-            ?? costs.first(where: { $0.source == .localEstimate && $0.currency == "USD" })
+        let wallet = preferred.flatMap { AIUsageCost.isCreditUnit($0) ? nil : $0 }
 
+        // Money wins whenever the provider reports any — even when the pinned balance is an
+        // allowance measured in credits.
+        if let plan = plan(for: costs.filter { !AIUsageCost.isCreditUnit($0.currency) }, wallet: wallet) {
+            return series(points, plan: plan, rates: rates) { !AIUsageCost.isCreditUnit($0.currency) }
+        }
+        if let plan = plan(for: costs.filter { AIUsageCost.isCreditUnit($0.currency) }, wallet: nil) {
+            return series(points, plan: plan, rates: rates) { AIUsageCost.isCreditUnit($0.currency) }
+        }
         return points.map { point in
-            let selected = selection.map { selection in
-                AIUsageCost(
-                    amount: point.costs.filter { $0.currency == selection.currency && $0.source == selection.source }
-                        .reduce(0) { $0 + $1.amount },
-                    currency: selection.currency,
-                    source: selection.source
-                )
-            }
-            return AIUsageWidgetDailyPoint(
+            AIUsageWidgetDailyPoint(
                 dayKey: point.dayKey, tokens: point.tokens, requests: point.requests,
-                costs: point.costs, selectedCost: selected
+                costs: point.costs, selectedCost: nil
             )
+        }
+    }
+
+    private struct Plan {
+        var target: String
+        var converts: Bool
+        /// Source reported for a bucket that has nothing to plot, and the tie-break when a bucket
+        /// has no money movement at all.
+        var fallbackSource: AIUsageCostSource
+    }
+
+    private static func plan(for costs: [AIUsageCost], wallet: String?) -> Plan? {
+        guard !costs.isEmpty else { return nil }
+        let currencies = Set(costs.map(\.currency)).sorted()
+        guard !currencies.isEmpty else { return nil }
+        let hasWalletDelta = costs.contains { $0.source == .balanceDelta }
+        let fallbackSource: AIUsageCostSource = hasWalletDelta ? .balanceDelta : .localEstimate
+
+        if let wallet {
+            return Plan(
+                target: wallet,
+                converts: currencies.contains { $0 != wallet },
+                fallbackSource: fallbackSource
+            )
+        }
+        if currencies.count == 1, let only = currencies.first {
+            return Plan(target: only, converts: false, fallbackSource: fallbackSource)
+        }
+        if currencies.contains("USD") {
+            return Plan(target: "USD", converts: true, fallbackSource: fallbackSource)
+        }
+        return Plan(target: currencies[0], converts: false, fallbackSource: fallbackSource)
+    }
+
+    private static func series(
+        _ points: [AIUsageWidgetDailyPoint],
+        plan: Plan,
+        rates: AIUsageCurrencyRates,
+        include: (AIUsageCost) -> Bool
+    ) -> [AIUsageWidgetDailyPoint] {
+        points.map { point in
+            var sums: [AIUsageCostSource: Double] = [:]
+            for cost in point.costs where cost.amount > 0 && include(cost) {
+                let converted: Double?
+                if AIUsageCost.normalizedCurrency(cost.currency) == plan.target {
+                    converted = cost.amount
+                } else if plan.converts {
+                    converted = rates.convert(cost.amount, from: cost.currency, to: plan.target)
+                } else {
+                    converted = nil
+                }
+                guard let converted, converted.isFinite else { continue }
+                sums[cost.source, default: 0] += converted
+            }
+
+            // One number per bucket: real money if the wallet moved, otherwise the log proxy.
+            let source: AIUsageCostSource
+            let amount: Double
+            if let delta = sums[.balanceDelta] {
+                source = .balanceDelta
+                amount = delta
+            } else if let estimate = sums[.localEstimate] {
+                source = .localEstimate
+                amount = estimate
+            } else {
+                source = plan.fallbackSource
+                amount = 0
+            }
+
+            return AIUsageWidgetDailyPoint(
+                dayKey: point.dayKey,
+                tokens: point.tokens,
+                requests: point.requests,
+                costs: point.costs,
+                selectedCost: AIUsageCost(amount: amount, currency: plan.target, source: source)
+            )
+        }
+    }
+
+    private static func rank(_ source: AIUsageCostSource) -> Int {
+        switch source {
+        case .balanceDelta: return 0
+        case .localEstimate: return 1
         }
     }
 }
@@ -220,7 +348,7 @@ public enum AIUsageWidgetSharedConstants {
         let suffix = ".com.powernotch.app"
         return groupID.hasSuffix(suffix) && groupID.count > suffix.count && !groupID.contains("$(")
     }
-    public static let currentSchemaVersion = 3
+    public static let currentSchemaVersion = 4
     public static let widgetKind = "com.powernotch.app.aiUsageWidget"
     public static let payloadFileName = "ai-usage-widget-state.json"
     public static let refreshRequestNotification = Notification.Name("com.powernotch.app.aiUsage.requestRefresh")
@@ -484,6 +612,9 @@ struct AIUsageWidgetProviderPage: Codable, Identifiable, Sendable, Equatable {
     let ringGroups: [AIUsageWidgetRingGroup]
     let balance: AIUsageWidgetBalance?
     let dailyHistory: [AIUsageWidgetDailyPoint]
+    /// Last 24 hours, bucketed by hour, for the 1-day trend. Wallet balances are sampled per
+    /// refresh, so these buckets come from usage logs only.
+    let hourlyHistory: [AIUsageWidgetDailyPoint]
     let costCurrencySymbol: String
 
     init(
@@ -507,6 +638,7 @@ struct AIUsageWidgetProviderPage: Codable, Identifiable, Sendable, Equatable {
         ringGroups: [AIUsageWidgetRingGroup],
         balance: AIUsageWidgetBalance?,
         dailyHistory: [AIUsageWidgetDailyPoint] = [],
+        hourlyHistory: [AIUsageWidgetDailyPoint] = [],
         costCurrencySymbol: String = "$"
     ) {
         self.id = id
@@ -529,6 +661,7 @@ struct AIUsageWidgetProviderPage: Codable, Identifiable, Sendable, Equatable {
         self.ringGroups = ringGroups
         self.balance = balance
         self.dailyHistory = dailyHistory
+        self.hourlyHistory = hourlyHistory
         self.costCurrencySymbol = costCurrencySymbol
     }
 
@@ -537,7 +670,7 @@ struct AIUsageWidgetProviderPage: Codable, Identifiable, Sendable, Equatable {
         case accentRed, accentGreen, accentBlue
         case innerRed, innerGreen, innerBlue
         case planName, accountLabel, sourceLabel, statusNote, errorMessage, updatedAt
-        case ringGroups, balance, dailyHistory, costCurrencySymbol
+        case ringGroups, balance, dailyHistory, hourlyHistory, costCurrencySymbol
     }
 
     init(from decoder: Decoder) throws {
@@ -562,6 +695,7 @@ struct AIUsageWidgetProviderPage: Codable, Identifiable, Sendable, Equatable {
         ringGroups = try c.decode([AIUsageWidgetRingGroup].self, forKey: .ringGroups)
         balance = try c.decodeIfPresent(AIUsageWidgetBalance.self, forKey: .balance)
         dailyHistory = try c.decodeIfPresent([AIUsageWidgetDailyPoint].self, forKey: .dailyHistory) ?? []
+        hourlyHistory = try c.decodeIfPresent([AIUsageWidgetDailyPoint].self, forKey: .hourlyHistory) ?? []
         costCurrencySymbol = try c.decodeIfPresent(String.self, forKey: .costCurrencySymbol) ?? "$"
     }
 

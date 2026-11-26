@@ -34,7 +34,12 @@ final class AIUsageManager: ObservableObject {
     private var refreshTimerTask: Task<Void, Never>?
     private var historyCollectionTask: Task<Void, Never>?
     private var cachedDailyHistories: [AIProviderID: [AIUsageWidgetDailyPoint]] = [:]
+    private var cachedHourlyHistories: [AIProviderID: [AIUsageWidgetDailyPoint]] = [:]
     private var lastHistoryCollectionAt: Date?
+    /// USD-pivot rates for the 30-day chart, refreshed at most once a week and cached so a
+    /// mixed-currency history still charts offline.
+    private var currencyRates: AIUsageCurrencyRates = .fallback
+    private var currencyRatesTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
     /// Returns the real user home directory (`/Users/<username>`) even when running inside App Sandbox.
@@ -59,11 +64,13 @@ final class AIUsageManager: ObservableObject {
         }
         loadProviderConfigs()
         loadCachedSnapshots()
+        loadCurrencyRates()
         observeSettingsChanges()
         observeWidgetRefreshRequests()
         schedulePeriodicRefresh()
         syncWidgetSnapshot()
         refresh30DayHistoriesAndSync(force: true)
+        refreshCurrencyRatesIfNeeded()
 
         Task {
             try? await Task.sleep(for: .seconds(0.8))
@@ -222,6 +229,50 @@ final class AIUsageManager: ObservableObject {
         self.snapshots = decoded
     }
 
+    // MARK: - Currency Rates
+
+    private func loadCurrencyRates() {
+        guard let data = Defaults[.aiUsageCurrencyRatesData],
+              let decoded = try? JSONDecoder().decode(AIUsageCurrencyRates.self, from: data)
+        else { return }
+        currencyRates = decoded
+    }
+
+    private func saveCurrencyRates() {
+        if let data = try? JSONEncoder().encode(currencyRates) {
+            Defaults[.aiUsageCurrencyRatesData] = data
+        }
+    }
+
+    /// Refreshes the USD-pivot table the 30-day chart converts with. Only a chart that mixes
+    /// currencies reads these rates, so a failed refresh costs nothing but the conversion.
+    private func refreshCurrencyRatesIfNeeded() {
+        guard currencyRates.isStale else { return }
+        currencyRatesTask?.cancel()
+        currencyRatesTask = Task.detached(priority: .utility) { [weak self] in
+            let fetched = await Self.fetchCurrencyRates()
+            guard let fetched else { return }
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.currencyRates = fetched
+                self.saveCurrencyRates()
+                self.refresh30DayHistoriesAndSync(force: true)
+            }
+        }
+    }
+
+    nonisolated private static func fetchCurrencyRates() async -> AIUsageCurrencyRates? {
+        guard let url = URL(string: "https://open.er-api.com/v6/latest/USD") else { return nil }
+        var req = URLRequest(url: url, timeoutInterval: 12)
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              let http = resp as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        return AIUsageCurrencyRates.fromFeed(json)
+    }
+
     private func saveCachedSnapshots() {
         if let data = try? JSONEncoder().encode(snapshots) {
             Defaults[.aiUsageCachedSnapshotsData] = data
@@ -235,6 +286,7 @@ final class AIUsageManager: ObservableObject {
             enabledProviders: enabledProviders,
             snapshots: snapshots,
             dailyHistories: cachedDailyHistories,
+            hourlyHistories: cachedHourlyHistories,
             showRemainingPercent: Defaults[.aiUsageShowRemainingPercent],
             hideAccountEmails: Defaults[.aiUsageHideAccountEmails]
         )
@@ -254,6 +306,7 @@ final class AIUsageManager: ObservableObject {
 
         let snapshotsCopy = snapshots
         let homePath = Self.realUserHomePath
+        let ratesCopy = currencyRates
 
         historyCollectionTask?.cancel()
         let requestID = UUID()
@@ -262,12 +315,20 @@ final class AIUsageManager: ObservableObject {
             let histories = AIUsageHistoryCollector.collect30DayHistories(
                 for: activeProviders,
                 snapshots: snapshotsCopy,
-                realUserHomePath: homePath
+                realUserHomePath: homePath,
+                rates: ratesCopy
+            )
+            let hourlyHistories = AIUsageHistoryCollector.collect24HourHistories(
+                for: activeProviders,
+                snapshots: snapshotsCopy,
+                realUserHomePath: homePath,
+                rates: ratesCopy
             )
             guard !Task.isCancelled else { return }
             await MainActor.run { [weak self] in
                 guard let self, self.historyRequestID == requestID else { return }
                 self.cachedDailyHistories = histories
+                self.cachedHourlyHistories = hourlyHistories
                 self.lastHistoryCollectionAt = Date()
                 self.syncWidgetSnapshot()
             }
@@ -707,35 +768,87 @@ extension AIUsageManager {
             var balance: AIUsageBalance?
             var statusNote: String?
 
-            if let credits = json["credits"] as? [String: Any] {
-                if let balVal = Self.doubleValue(credits["balance"]) {
-                    balance = AIUsageBalance(currency: "Credits", remaining: balVal)
-                } else if (credits["unlimited"] as? Bool) == true {
-                    statusNote = "Unlimited credits"
+            let creditsObject = json["credits"] as? [String: Any]
+            let hasCredits = (creditsObject?["has_credits"] as? Bool) == true
+            let hasUnlimitedCredits = (creditsObject?["unlimited"] as? Bool) == true
+            if hasUnlimitedCredits {
+                statusNote = "Unlimited credits"
+            }
+
+            // A workspace account (education / business / enterprise) answers `has_credits: true`
+            // with `balance: null`: the number lives behind the per-user monthly spend control
+            // rather than in the usage document. Read it best-effort, since the pool windows in
+            // this same snapshot do not depend on it.
+            var monthlyCreditsDocument: [String: Any]?
+            if Self.doubleValue(creditsObject?["balance"]) == nil,
+               hasCredits,
+               !hasUnlimitedCredits,
+               let creditsAccountId = cred.accountId ?? (json["account_id"] as? String),
+               !creditsAccountId.isEmpty
+            {
+                monthlyCreditsDocument = await Self.fetchCodexMonthlyCreditUsage(
+                    base: base,
+                    accountId: creditsAccountId,
+                    token: cred.token
+                )
+            }
+
+            // A credit allowance with a stated ceiling is a quota, not a wallet: it earns a ring
+            // next to the subscription pool. Only an uncapped prepaid balance stays a text line,
+            // the way a pay-as-you-go top-up reads.
+            func appendCreditAllowanceWindow(_ credits: AIUsageCodexCredits.View) {
+                guard credits.source == .monthlyCap,
+                      let usedPercent = credits.usedPercent
+                else { return }
+                windows.append(
+                    AIUsageRateWindow(
+                        id: "codex_credits_monthly",
+                        label: "Monthly Credits",
+                        usedPercent: usedPercent,
+                        detailText: credits.usageText,
+                        resetAt: AIUsageCodexCredits.nextMonthStart()
+                    )
+                )
+            }
+
+            if let credits = AIUsageCodexCredits.view(usageJSON: json, monthlyUsageJSON: monthlyCreditsDocument) {
+                switch credits.source {
+                case .monthlyCap:
+                    appendCreditAllowanceWindow(credits)
+                case .prepaidBalance:
+                    balance = AIUsageBalance(
+                        currency: "CREDITS",
+                        remaining: credits.remaining
+                    )
                 }
             }
 
-            if balance == nil,
-               let spendControl = json["spend_control"] as? [String: Any],
+            if let spendControl = json["spend_control"] as? [String: Any],
                let individual = spendControl["individual_limit"] as? [String: Any]
             {
                 let limit = Self.doubleValue(individual["limit"]) ?? Self.doubleValue(individual["max_amount"])
                 let used = Self.doubleValue(individual["used"]) ?? Self.doubleValue(individual["current_usage"])
                 let remaining = Self.doubleValue(individual["remaining"]) ?? ((limit != nil && used != nil) ? max(0, limit! - used!) : nil)
-                if let remaining {
-                    balance = AIUsageBalance(
-                        currency: "Credits",
-                        remaining: remaining,
-                        usedThisPeriod: used,
-                        limit: limit,
-                        periodLabel: "Credit limit"
-                    )
+                if balance == nil, !windows.contains(where: { $0.id == "codex_credits_monthly" }) {
+                    if let limit, limit > 0, let used {
+                        appendCreditAllowanceWindow(
+                            AIUsageCodexCredits.View(
+                                source: .monthlyCap,
+                                remaining: remaining,
+                                usedThisPeriod: used,
+                                limit: limit
+                            )
+                        )
+                    } else if let remaining {
+                        balance = AIUsageBalance(currency: "CREDITS", remaining: remaining)
+                    }
                 }
             }
 
             // For Education / Business / Enterprise workspaces where `/wham/usage` omits numeric `credits.balance`
             // (returns `has_credits: true, balance: null`), check local synced workspace credit snapshot.
             if balance == nil,
+               !windows.contains(where: { $0.id == "codex_credits_monthly" }),
                let credits = json["credits"] as? [String: Any],
                (credits["has_credits"] as? Bool) == true
             {
@@ -750,7 +863,7 @@ extension AIUsageManager {
                    let rem = Self.doubleValue(localObj["remaining"])
                 {
                     balance = AIUsageBalance(
-                        currency: "Credits",
+                        currency: "CREDITS",
                         remaining: rem,
                         usedThisPeriod: Self.doubleValue(localObj["used"]),
                         limit: Self.doubleValue(localObj["limit"]),
@@ -773,6 +886,29 @@ extension AIUsageManager {
         } catch {
             return errorSnapshot(.codex, source: cred.source, message: error.localizedDescription)
         }
+    }
+
+    /// Best-effort read of the per-user monthly credit allowance. The usage route already answered,
+    /// so a refused or malformed cap route costs the credits number instead of the whole snapshot.
+    nonisolated private static func fetchCodexMonthlyCreditUsage(
+        base: String,
+        accountId: String,
+        token: String
+    ) async -> [String: Any]? {
+        guard let url = AIUsageCodexCredits.monthlyUsageURL(base: base, accountID: accountId) else { return nil }
+        var req = URLRequest(url: url, timeoutInterval: 10)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue(accountId, forHTTPHeaderField: "ChatGPT-Account-Id")
+        // The accounts route sits behind the web app's edge, which rejects a request that arrives
+        // without a user agent; `/wham/usage` does not care either way.
+        req.setValue("powerNotch/1.0 (macOS)", forHTTPHeaderField: "User-Agent")
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              let http = resp as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        return json
     }
 
     nonisolated private static func parseCodexWindow(_ dict: [String: Any], id: String, defaultLabel: String) -> AIUsageRateWindow? {
@@ -2106,8 +2242,8 @@ extension AIUsageManager {
 
                 if let quota = root["quota"] as? [String: Any] {
                     let total = Self.doubleValue(quota["total_credits"]) ?? 0
-                    let used = Self.doubleValue(quota["used_credits"]) ?? 0
-                    let remaining = Self.doubleValue(quota["remaining_credits"]) ?? max(0, total - used)
+                    let used = Self.doubleValue(quota["used_credits"])
+                        ?? max(0, total - (Self.doubleValue(quota["remaining_credits"]) ?? total))
                     if total > 0 {
                         let pct = (used / total) * 100.0
                         windows.append(
@@ -2115,18 +2251,11 @@ extension AIUsageManager {
                                 id: "mimo_token_plan",
                                 label: "Token Plan Quota",
                                 usedPercent: pct,
-                                detailText: "\(AIUsageBalance.formatAmount(remaining, currency: "CREDITS")) left",
+                                detailText: String(format: "%.0f/%.0f cr", used, total),
                                 resetAt: resetDate
                             )
                         )
                     }
-                    balance = AIUsageBalance(
-                        currency: "CREDITS",
-                        remaining: remaining,
-                        usedThisPeriod: used,
-                        limit: total > 0 ? total : nil,
-                        periodLabel: "Credits"
-                    )
                 }
 
                 return AIProviderSnapshot(
@@ -2641,6 +2770,9 @@ extension AIUsageManager {
 
         let isGlobal = config.region == "global"
         let codeBase = isGlobal ? "https://api.kimi.ai/coding/v1/usages" : "https://api.kimi.com/coding/v1/usages"
+        // The coding plan and the Moonshot wallet are two products on one account: a subscription
+        // does not mean the wallet is empty, so read it next to the plan instead of only after it.
+        let canReadWallet = cred.token.hasPrefix("sk-") || cred.source == "moonshot-api" || cred.source == "api"
 
         // 1. Try Kimi Code `/coding/v1/usages` first
         if let codeURL = URL(string: codeBase) {
@@ -2672,13 +2804,19 @@ extension AIUsageManager {
                     }
                 }
                 if !windows.isEmpty {
+                    var balance: AIUsageBalance?
+                    if canReadWallet,
+                       case .balance(let wallet) = await Self.fetchKimiMoonshotBalance(cred: cred, isGlobal: isGlobal)
+                    {
+                        balance = wallet
+                    }
                     return AIProviderSnapshot(
                         provider: .kimi,
                         sourceLabel: cred.source,
                         accountLabel: nil,
                         planName: (json["membership"] as? String) ?? "Kimi Code",
                         windows: windows,
-                        balance: nil,
+                        balance: balance,
                         statusNote: nil,
                         errorMessage: nil,
                         updatedAt: Date()
@@ -2688,39 +2826,8 @@ extension AIUsageManager {
         }
 
         // 2. Fallback to Moonshot Open Platform balance API (`/v1/users/me/balance`)
-        let moonshotBase = isGlobal
-            ? "https://api.moonshot.ai/v1/users/me/balance"
-            : "https://api.moonshot.cn/v1/users/me/balance"
-        guard let balanceURL = URL(string: moonshotBase) else {
-            return errorSnapshot(.kimi, source: cred.source, message: "Invalid Kimi URL")
-        }
-
-        var req = URLRequest(url: balanceURL, timeoutInterval: 10)
-        req.setValue("Bearer \(cred.token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        do {
-            let (data, resp) = try await URLSession.shared.data(for: req)
-            guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-                return errorSnapshot(.kimi, source: cred.source, message: "HTTP \(code)")
-            }
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let dataObj = json["data"] as? [String: Any],
-                  let available = Self.doubleValue(dataObj["available_balance"])
-            else {
-                return errorSnapshot(.kimi, source: cred.source, message: "Invalid Kimi balance payload")
-            }
-
-            let cash = Self.doubleValue(dataObj["cash_balance"])
-            let voucher = Self.doubleValue(dataObj["voucher_balance"])
-            let balance = AIUsageBalance(
-                currency: isGlobal ? "USD" : "CNY",
-                remaining: available,
-                granted: voucher,
-                toppedUp: cash
-            )
-
+        switch await Self.fetchKimiMoonshotBalance(cred: cred, isGlobal: isGlobal) {
+        case .balance(let balance):
             return AIProviderSnapshot(
                 provider: .kimi,
                 sourceLabel: "moonshot-api",
@@ -2732,8 +2839,57 @@ extension AIUsageManager {
                 errorMessage: nil,
                 updatedAt: Date()
             )
+        case .failure(let message):
+            return errorSnapshot(.kimi, source: cred.source, message: message)
+        }
+    }
+
+    private enum KimiWalletOutcome {
+        case balance(AIUsageBalance)
+        case failure(String)
+    }
+
+    /// Moonshot Open Platform wallet (`available_balance` + cash/voucher split).
+    nonisolated private static func fetchKimiMoonshotBalance(
+        cred: (token: String, source: String),
+        isGlobal: Bool
+    ) async -> KimiWalletOutcome {
+        let moonshotBase = isGlobal
+            ? "https://api.moonshot.ai/v1/users/me/balance"
+            : "https://api.moonshot.cn/v1/users/me/balance"
+        guard let balanceURL = URL(string: moonshotBase) else {
+            return .failure("Invalid Kimi URL")
+        }
+
+        var req = URLRequest(url: balanceURL, timeoutInterval: 10)
+        req.setValue("Bearer \(cred.token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+                return .failure("HTTP \(code)")
+            }
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let dataObj = json["data"] as? [String: Any],
+                  let available = Self.doubleValue(dataObj["available_balance"])
+            else {
+                return .failure("Invalid Kimi balance payload")
+            }
+
+            let cash = Self.doubleValue(dataObj["cash_balance"])
+            let voucher = Self.doubleValue(dataObj["voucher_balance"])
+            return .balance(
+                AIUsageBalance(
+                    currency: isGlobal ? "USD" : "CNY",
+                    remaining: available,
+                    granted: voucher,
+                    toppedUp: cash
+                )
+            )
         } catch {
-            return errorSnapshot(.kimi, source: cred.source, message: error.localizedDescription)
+            return .failure(error.localizedDescription)
         }
     }
 
