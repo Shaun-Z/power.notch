@@ -88,6 +88,30 @@ struct AIUsageWidgetSelectChartMetricIntent: AppIntent {
     }
 }
 
+struct AIUsageWidgetSelectChartRangeIntent: AppIntent {
+    static var title: LocalizedStringResource = "Select Trend Range"
+    static var description = IntentDescription("Switch the usage line chart between 24 hours, 7 days, and 30 days.")
+
+    @Parameter(title: "Range")
+    var rangeRaw: String
+
+    init() {
+        self.rangeRaw = AIUsageChartRange.month.rawValue
+    }
+
+    init(range: AIUsageChartRange) {
+        self.rangeRaw = range.rawValue
+    }
+
+    func perform() async throws -> some IntentResult {
+        if let range = AIUsageChartRange(rawValue: rangeRaw) {
+            AIUsageWidgetStore.setSelectedChartRange(range)
+            WidgetCenter.shared.reloadTimelines(ofKind: AIUsageWidgetConstants.widgetKind)
+        }
+        return .result()
+    }
+}
+
 struct AIUsageWidgetRefreshIntent: AppIntent {
     static var title: LocalizedStringResource = "Refresh AI Usage"
     static var description = IntentDescription("Request PowerNotch to refresh AI usage data.")

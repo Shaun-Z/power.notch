@@ -160,6 +160,10 @@
 		A17000000000000000000012 /* CodexUsageLogParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000002 /* CodexUsageLogParser.swift */; };
 		A17000000000000000000013 /* AIUsageRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000003 /* AIUsageRefreshCoordinator.swift */; };
 		A17000000000000000000014 /* AIUsageHistoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000001 /* AIUsageHistoryModels.swift */; };
+		A17000000000000000000017 /* CurrencyRates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000005 /* CurrencyRates.swift */; };
+		A17000000000000000000015 /* CodexCredits.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000004 /* CodexCredits.swift */; };
+		A17000000000000000000016 /* CurrencyRates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000005 /* CurrencyRates.swift */; };
+		A17000000000000000000018 /* TrendWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000006 /* TrendWindow.swift */; };
 		A18000000000000000000011 /* NetEaseMusicLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A18000000000000000000001 /* NetEaseMusicLibrary.swift */; };
 		A18000000000000000000012 /* NetEaseMusicController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A18000000000000000000002 /* NetEaseMusicController.swift */; };
 /* End PBXBuildFile section */
@@ -365,6 +369,9 @@
 		A17000000000000000000001 /* AIUsageHistoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageHistoryModels.swift; sourceTree = "<group>"; };
 		A17000000000000000000002 /* CodexUsageLogParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageLogParser.swift; sourceTree = "<group>"; };
 		A17000000000000000000003 /* AIUsageRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageRefreshCoordinator.swift; sourceTree = "<group>"; };
+		A17000000000000000000004 /* CodexCredits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexCredits.swift; sourceTree = "<group>"; };
+		A17000000000000000000005 /* CurrencyRates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyRates.swift; sourceTree = "<group>"; };
+		A17000000000000000000006 /* TrendWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendWindow.swift; sourceTree = "<group>"; };
 		A18000000000000000000001 /* NetEaseMusicLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetEaseMusicLibrary.swift; sourceTree = "<group>"; };
 		A18000000000000000000002 /* NetEaseMusicController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetEaseMusicController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -856,6 +863,9 @@
                 A37000000000000000000001 /* SecretAndSQLiteUtilities.swift */,
 				A17000000000000000000002 /* CodexUsageLogParser.swift */,
 				A17000000000000000000003 /* AIUsageRefreshCoordinator.swift */,
+				A17000000000000000000004 /* CodexCredits.swift */,
+				A17000000000000000000005 /* CurrencyRates.swift */,
+				A17000000000000000000006 /* TrendWindow.swift */,
 			);
 			path = AIUsageCore;
 			sourceTree = "<group>";
@@ -1057,6 +1067,9 @@
                 A37000000000000000000002 /* SecretAndSQLiteUtilities.swift in Sources */,
 				A17000000000000000000012 /* CodexUsageLogParser.swift in Sources */,
 				A17000000000000000000013 /* AIUsageRefreshCoordinator.swift in Sources */,
+				A17000000000000000000015 /* CodexCredits.swift in Sources */,
+				A17000000000000000000016 /* CurrencyRates.swift in Sources */,
+				A17000000000000000000018 /* TrendWindow.swift in Sources */,
 				115C12EC2ED3D003009754CA /* OpenNotchHUD.swift in Sources */,
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,
 				9B9763D330B0373500CCA45B /* AIUsageModels.swift in Sources */,
@@ -1189,6 +1202,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A17000000000000000000014 /* AIUsageHistoryModels.swift in Sources */,
+				A17000000000000000000017 /* CurrencyRates.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

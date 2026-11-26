@@ -264,6 +264,8 @@ private struct NotchAIProviderCompactCard: View {
 
                 Spacer(minLength: 2)
 
+                // A funded balance (top-up money or prepaid credits) sits beside the rings: it is
+                // a wallet, not a quota, so it never becomes a ring of its own.
                 if let balance = snapshot?.balance,
                    !groups.isEmpty,
                    let primary = balance.allCurrencyBalances.first
@@ -891,7 +893,7 @@ private struct NotchAIProviderCompactCard: View {
                             .foregroundStyle(ink.primary(0.95))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                        if let sub = balance.formattedBreakdown {
+                        if let sub = balance.formattedBreakdown(showRemaining: showRemaining) {
                             Text(sub)
                                 .font(.system(size: 8.5, weight: .medium, design: .rounded))
                                 .foregroundStyle(ink.secondary(0.52))
@@ -916,7 +918,7 @@ private struct NotchAIProviderCompactCard: View {
                     .foregroundStyle(ink.primary(0.95))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                if let sub = balance.formattedBreakdown {
+                if let sub = balance.formattedBreakdown(showRemaining: showRemaining) {
                     Text(sub)
                         .font(.system(size: 8.5, weight: .medium, design: .rounded))
                         .foregroundStyle(ink.secondary(0.52))
@@ -942,7 +944,7 @@ private struct NotchAIProviderCompactCard: View {
         isPinned: Bool
     ) -> String {
         var lines: [String] = ["\(provider.displayName) Balance (\(item.currency)): \(item.formattedRemaining)"]
-        if let breakdown = balance.formattedBreakdown {
+        if let breakdown = balance.formattedBreakdown(showRemaining: showRemaining) {
             lines.append(breakdown)
         }
         lines.append(isPinned ? "Pinned to closed notch" : "Click to show in closed notch")
@@ -962,8 +964,11 @@ private struct NotchAIProviderCompactCard: View {
             lines.append(formatWindowTooltip(group.outerWindow, prefix: ""))
         }
         if let balance = snapshot?.balance {
-            var balText = "Balance: \(balance.formattedRemaining)"
-            if let breakdown = balance.formattedBreakdown {
+            let balanceLabel = balance.allCurrencyBalances.contains { AIUsageCost.isCreditUnit($0.currency) }
+                ? "Credits"
+                : "Balance"
+            var balText = "\(balanceLabel): \(balance.formattedRemaining)"
+            if let breakdown = balance.formattedBreakdown(showRemaining: showRemaining) {
                 balText += " · \(breakdown)"
             }
             lines.append(balText)
@@ -979,8 +984,8 @@ private struct NotchAIProviderCompactCard: View {
         if let detail = window.detailText {
             parts.append(detail)
         }
-        if let reset = window.resetCountdownText {
-            parts.append("resets in \(reset)")
+        if let reset = window.resetSummaryText {
+            parts.append(reset)
         }
         return parts.joined(separator: " · ")
     }

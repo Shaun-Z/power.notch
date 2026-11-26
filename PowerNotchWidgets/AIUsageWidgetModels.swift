@@ -43,6 +43,47 @@ enum AIUsageChartMetric: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// The window the trend card plots. 1D needs hour buckets, which only usage logs can fill.
+enum AIUsageChartRange: String, CaseIterable, Identifiable, Sendable {
+    case day
+    case week
+    case month
+
+    var id: String { rawValue }
+
+    var shortLabel: String {
+        switch self {
+        case .day: return "1D"
+        case .week: return "7D"
+        case .month: return "30D"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .day: return "24-Hour Trend"
+        case .week: return "7-Day Trend"
+        case .month: return "30-Day Trend"
+        }
+    }
+
+    var totalLabel: String {
+        switch self {
+        case .day: return "24h"
+        case .week: return "7d"
+        case .month: return "30d"
+        }
+    }
+
+    func points(for page: AIUsageWidgetProviderPage) -> [AIUsageWidgetDailyPoint] {
+        switch self {
+        case .day: return Array(page.hourlyHistory.suffix(24))
+        case .week: return Array(page.dailyHistory.suffix(7))
+        case .month: return Array(page.dailyHistory.suffix(30))
+        }
+    }
+}
+
 extension AIUsageWidgetProviderPage {
     var accentColor: Color {
         Color(red: accentRed, green: accentGreen, blue: accentBlue)
@@ -70,6 +111,7 @@ extension AIUsageWidgetProviderPage {
 
 enum AIUsageWidgetStore {
     private static let chartMetricKey = "aiUsageWidget.large.selectedChartMetric"
+    private static let chartRangeKey = "aiUsageWidget.large.selectedChartRange"
 
     private static func payloadFileURL() -> URL? {
         AIUsageWidgetSharedConstants.payloadFileURL()
@@ -110,6 +152,17 @@ enum AIUsageWidgetStore {
 
     static func setSelectedChartMetric(_ metric: AIUsageChartMetric) {
         defaults.set(metric.rawValue, forKey: chartMetricKey)
+    }
+
+    static func selectedChartRange() -> AIUsageChartRange {
+        guard let raw = defaults.string(forKey: chartRangeKey),
+              let range = AIUsageChartRange(rawValue: raw)
+        else { return .month }
+        return range
+    }
+
+    static func setSelectedChartRange(_ range: AIUsageChartRange) {
+        defaults.set(range.rawValue, forKey: chartRangeKey)
     }
 
     static func resolvePage(

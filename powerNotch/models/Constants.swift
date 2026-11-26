@@ -520,4 +520,5 @@ extension Defaults.Keys {
     static let aiUsagePinnedRingID = Key<String>("aiUsagePinnedRingID", default: "")
     static let aiUsageProviderConfigsData = Key<Data?>("aiUsageProviderConfigsData", default: nil)
     static let aiUsageCachedSnapshotsData = Key<Data?>("aiUsageCachedSnapshotsData", default: nil)
+    static let aiUsageCurrencyRatesData = Key<Data?>("aiUsageCurrencyRatesData", default: nil)
 }

@@ -40,22 +40,16 @@ enum AIUsageHistoryCollector {
 
     /// Generates the ordered list of the last `days` local calendar day keys ("YYYY-MM-DD"), oldest first.
     nonisolated static func recentDayKeys(days: Int = 30, now: Date = Date()) -> [String] {
-        let cal = Calendar.current
-        let todayStart = cal.startOfDay(for: now)
-        let formatter = makeDayFormatter()
-        return (0..<days).reversed().compactMap { offset -> String? in
-            guard let date = cal.date(byAdding: .day, value: -offset, to: todayStart) else { return nil }
-            return formatter.string(from: date)
-        }
+        AIUsageTrendWindow.dayKeys(days: days, now: now)
     }
 
     nonisolated private static func makeDayFormatter() -> DateFormatter {
-        let df = DateFormatter()
-        df.calendar = Calendar(identifier: .gregorian)
-        df.locale = Locale(identifier: "en_US_POSIX")
-        df.timeZone = .current
-        df.dateFormat = "yyyy-MM-dd"
-        return df
+        AIUsageTrendWindow.dayFormatter()
+    }
+
+    /// Generates the last `hours` hour keys, oldest first, ending with the current hour.
+    nonisolated static func recentHourKeys(hours: Int = 24, now: Date = Date()) -> [String] {
+        AIUsageTrendWindow.hourKeys(hours: hours, now: now)
     }
 
     /// Records latest snapshot balances into the persistent 30-day ledger to accumulate daily spend for API-balance providers.
@@ -117,20 +111,74 @@ enum AIUsageHistoryCollector {
         saveLedger(ledger, to: url)
     }
 
-    /// Collects 30-day daily usage series for all enabled providers off the main thread.
+    /// The window a trend chart covers. Day buckets feed the 7-/30-day views; hour buckets feed
+    /// the 1-day view, which only usage logs can fill — a wallet balance is sampled per refresh.
+    nonisolated enum HistoryBucket: Sendable {
+        case lastDays(Int)
+        case lastHours(Int)
+    }
+
+    /// Collects the 30-day daily usage series for all enabled providers off the main thread.
     nonisolated static func collect30DayHistories(
         for providers: [AIProviderID],
         snapshots: [AIProviderID: AIProviderSnapshot],
         realUserHomePath: String,
+        rates: AIUsageCurrencyRates = .fallback,
         now: Date = Date()
     ) -> [AIProviderID: [AIUsageWidgetDailyPoint]] {
-        let dayKeys = recentDayKeys(days: 30, now: now)
+        collectHistories(
+            bucket: .lastDays(30),
+            for: providers,
+            snapshots: snapshots,
+            realUserHomePath: realUserHomePath,
+            rates: rates,
+            now: now
+        )
+    }
+
+    /// Collects the last 24 hours bucketed per hour.
+    nonisolated static func collect24HourHistories(
+        for providers: [AIProviderID],
+        snapshots: [AIProviderID: AIProviderSnapshot],
+        realUserHomePath: String,
+        rates: AIUsageCurrencyRates = .fallback,
+        now: Date = Date()
+    ) -> [AIProviderID: [AIUsageWidgetDailyPoint]] {
+        collectHistories(
+            bucket: .lastHours(24),
+            for: providers,
+            snapshots: snapshots,
+            realUserHomePath: realUserHomePath,
+            rates: rates,
+            now: now
+        )
+    }
+
+    nonisolated private static func collectHistories(
+        bucket: HistoryBucket,
+        for providers: [AIProviderID],
+        snapshots: [AIProviderID: AIProviderSnapshot],
+        realUserHomePath: String,
+        rates: AIUsageCurrencyRates,
+        now: Date
+    ) -> [AIProviderID: [AIUsageWidgetDailyPoint]] {
+        let dayKeys: [String]
+        let cutoffDate: Date
+        let formatter: DateFormatter
+        switch bucket {
+        case .lastDays(let days):
+            dayKeys = recentDayKeys(days: days, now: now)
+            let cal = Calendar.current
+            cutoffDate = cal.date(byAdding: .day, value: -days, to: cal.startOfDay(for: now))
+                ?? now.addingTimeInterval(-Double(days) * 86400)
+            formatter = makeDayFormatter()
+        case .lastHours(let hours):
+            dayKeys = recentHourKeys(hours: hours, now: now)
+            cutoffDate = now.addingTimeInterval(-Double(hours) * 3600)
+            formatter = AIUsageTrendWindow.hourFormatter()
+        }
         let validKeySet = Set(dayKeys)
-        let cal = Calendar.current
-        let cutoffDate = cal.date(byAdding: .day, value: -30, to: cal.startOfDay(for: now))
-            ?? now.addingTimeInterval(-30 * 86400)
         let cutoffSec = Int64(cutoffDate.timeIntervalSince1970)
-        let formatter = makeDayFormatter()
 
         var bucketsByProvider: [AIProviderID: [String: AIUsageDailyBucket]] = [:]
         for p in providers {
@@ -242,12 +290,24 @@ enum AIUsageHistoryCollector {
 
         // Keep balance observations separate from USD local estimates, including their currency.
         var ledgerCosts: [AIProviderID: [String: AIUsageLedgerEntry]] = [:]
-        if let url = ledgerFileURL() {
+        var ledgerLegacyCurrencies: [AIProviderID: String] = [:]
+        if case .lastDays = bucket, let url = ledgerFileURL() {
             ledgerLock.lock()
             let ledger = loadLedger(from: url)
             ledgerLock.unlock()
+            // The ledger records one observation per day, so an hourly window has no wallet costs
+            // to add; it charts usage logs only.
             for provider in providers {
-                ledgerCosts[provider] = ledger.providers[provider.rawValue]?.daily
+                let providerLedger = ledger.providers[provider.rawValue]
+                ledgerCosts[provider] = providerLedger?.daily
+                // Days recorded before the ledger tracked currency can only be attributed when
+                // the provider's own deltas agree on one currency.
+                let recordedCurrencies = Set(providerLedger?.daily.values.flatMap { $0.costs.map(\.currency) } ?? [])
+                if recordedCurrencies.count == 1 {
+                    ledgerLegacyCurrencies[provider] = recordedCurrencies.first
+                } else if recordedCurrencies.isEmpty {
+                    ledgerLegacyCurrencies[provider] = providerLedger?.lastObservedCurrency
+                }
             }
         }
 
@@ -257,7 +317,7 @@ enum AIUsageHistoryCollector {
             let points = dayKeys.map { key in
                 let bucket = map[key] ?? AIUsageDailyBucket()
                 let observation = ledgerCosts[provider]?[key]
-                var costs = observation?.costs ?? []
+                var costs = observation?.attributedCosts(legacyCurrency: ledgerLegacyCurrencies[provider]) ?? []
                 if bucket.cost > 0 {
                     costs.append(AIUsageCost(amount: bucket.cost, currency: "USD", source: .localEstimate))
                 }
@@ -268,7 +328,11 @@ enum AIUsageHistoryCollector {
                     costs: costs
                 )
             }
-            result[provider] = AIUsageCostSeries.select(points, preferredCurrency: snapshots[provider]?.balance?.currency)
+            result[provider] = AIUsageCostSeries.select(
+                points,
+                preferredCurrency: snapshots[provider]?.balance?.currency,
+                rates: rates
+            )
         }
         return result
     }

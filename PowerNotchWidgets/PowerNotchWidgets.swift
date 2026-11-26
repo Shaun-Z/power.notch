@@ -89,6 +89,7 @@ struct AIUsageWidgetEntryView: View {
         let showRemaining = entry.payload?.showRemainingPercent ?? true
         let updatedAt = resolved?.page.updatedAt ?? entry.payload?.updatedAt
         let selectedChartMetric = AIUsageWidgetStore.selectedChartMetric()
+        let selectedChartRange = AIUsageWidgetStore.selectedChartRange()
 
         Group {
             if let resolved {
@@ -112,6 +113,7 @@ struct AIUsageWidgetEntryView: View {
                         familyKey: familyKey,
                         showRemaining: showRemaining,
                         selectedChartMetric: selectedChartMetric,
+                        selectedChartRange: selectedChartRange,
                         updatedAt: updatedAt,
                         referenceDate: entry.date
                     )
@@ -595,6 +597,7 @@ private struct LargeProviderPageView: View {
     let familyKey: String
     let showRemaining: Bool
     let selectedChartMetric: AIUsageChartMetric
+    let selectedChartRange: AIUsageChartRange
     let updatedAt: Date?
     let referenceDate: Date
 
@@ -660,9 +663,10 @@ private struct LargeProviderPageView: View {
             largeUpperQuotaSection
 
             // Lower Section: 30-Day Tokens / Spend / Requests Line Chart
-            Large30DayTrendCard(
+            LargeTrendCard(
                 page: page,
                 selectedMetric: selectedChartMetric,
+                selectedRange: selectedChartRange,
                 referenceDate: referenceDate
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -882,9 +886,10 @@ private struct LargeProviderPageView: View {
 
 // MARK: - Large Widget 30-Day Trend Line Chart Card
 
-private struct Large30DayTrendCard: View {
+private struct LargeTrendCard: View {
     let page: AIUsageWidgetProviderPage
     let selectedMetric: AIUsageChartMetric
+    let selectedRange: AIUsageChartRange
     let referenceDate: Date
 
     private struct IndexedPoint: Identifiable {
@@ -897,8 +902,13 @@ private struct Large30DayTrendCard: View {
     }
 
     private var resolvedHistory: [AIUsageWidgetDailyPoint] {
-        if !page.dailyHistory.isEmpty {
-            return Array(page.dailyHistory.suffix(30))
+        let window = selectedRange.points(for: page)
+        if !window.isEmpty {
+            return window
+        }
+        if selectedRange == .day {
+            // Hour buckets only come from usage logs; an empty list is a real "no usage" answer.
+            return []
         }
         // Build empty 30-day scaffold so axis labels remain clean
         let cal = Calendar.current
@@ -945,7 +955,7 @@ private struct Large30DayTrendCard: View {
         VStack(alignment: .leading, spacing: 7) {
             // Card Header: "30D Trend" + active peak / today callout
             HStack(spacing: 6) {
-                Text("30-Day Trend")
+                Text(selectedRange.title)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(.secondary)
 
@@ -958,10 +968,18 @@ private struct Large30DayTrendCard: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 } else {
-                    Text("Last 30 days")
+                    Text(selectedRange == .day ? "Last 24 hours" : "Last \(selectedRange.totalLabel)")
                         .font(.system(size: 9, weight: .medium, design: .rounded))
                         .foregroundStyle(.secondary.opacity(0.8))
                 }
+            }
+
+            // Range pills: 1D needs hour buckets, 7D/30D slice the daily series.
+            HStack(spacing: 4) {
+                ForEach(AIUsageChartRange.allCases) { range in
+                    rangePill(range)
+                }
+                Spacer(minLength: 0)
             }
 
             // 3 Interactive Metric Switcher Pills (Shows all 3 totals at once)
@@ -989,7 +1007,7 @@ private struct Large30DayTrendCard: View {
                         Image(systemName: "chart.xyaxis.line")
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(.secondary.opacity(0.7))
-                        Text("No 30-day \(selectedMetric.shortLabel.lowercased()) yet")
+                        Text("No \(selectedRange.totalLabel) \(selectedMetric.shortLabel.lowercased()) yet")
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundStyle(.secondary)
                     }
@@ -1088,10 +1106,32 @@ private struct Large30DayTrendCard: View {
     }
 
     @ViewBuilder
+    private func rangePill(_ range: AIUsageChartRange) -> some View {
+        let isActive = range == selectedRange
+        Button(intent: AIUsageWidgetSelectChartRangeIntent(range: range)) {
+            Text(range.shortLabel)
+                .font(.system(size: 8.5, weight: isActive ? .bold : .medium, design: .rounded))
+                .foregroundStyle(isActive ? Color.primary : Color.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2.5)
+                .background(
+                    Capsule()
+                        .fill(isActive ? page.accentColor.opacity(0.22) : Color.primary.opacity(0.06))
+                        .overlay {
+                            if isActive {
+                                Capsule().strokeBorder(page.accentColor.opacity(0.5), lineWidth: 0.7)
+                            }
+                        }
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
     private func metricPill(for metric: AIUsageChartMetric) -> some View {
         let isActive = metric == selectedMetric
         let tint = metricColor(for: metric)
-        let totalText = formatted30DayTotal(for: metric)
+        let totalText = formattedRangeTotal(for: metric)
 
         Button(intent: AIUsageWidgetSelectChartMetricIntent(metric: metric)) {
             VStack(alignment: .leading, spacing: 1.5) {
@@ -1129,16 +1169,18 @@ private struct Large30DayTrendCard: View {
         .buttonStyle(.plain)
     }
 
-    private func formatted30DayTotal(for metric: AIUsageChartMetric) -> String {
+    /// Totals follow the selected range, so a 1D pill never advertises a 30-day number.
+    private func formattedRangeTotal(for metric: AIUsageChartMetric) -> String {
+        let window = resolvedHistory
         switch metric {
         case .tokens:
-            let t = page.total30dTokens
+            let t = window.reduce(Int64(0)) { $0 + max(0, $1.tokens) }
             return t > 0 ? formatCompactCount(Double(t)) : "—"
         case .cost:
-            let c = page.total30dCost
+            let c = window.reduce(0) { $0 + max(0, $1.cost) }
             return c > 0.0001 ? formatCompactCurrency(c, symbol: page.costCurrencySymbol) : "—"
         case .requests:
-            let r = page.total30dRequests
+            let r = window.reduce(0) { $0 + max(0, $1.requests) }
             return r > 0 ? formatCompactCount(Double(r)) : "—"
         }
     }
