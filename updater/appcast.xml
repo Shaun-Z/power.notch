@@ -3,28 +3,54 @@
     <channel>
         <title>powerNotch</title>
         <item>
-            <title>0.1.1</title>
-            <pubDate>Wed, 25 Nov 2026 11:26:18 +0000</pubDate>
+            <title>0.1.2</title>
+            <pubDate>Thu, 26 Nov 2026 08:24:59 +0000</pubDate>
             <link>https://github.com/Shaun-Z/power.notch/releases</link>
-            <sparkle:version>273</sparkle:version>
-            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:version>274</sparkle:version>
+            <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[Desktop widgets can now read AI usage snapshots in ad-hoc builds without requiring a paid Apple Developer account or a provisioned App Group.
+            <description><![CDATA[# powerNotch 0.1.2
 
-- Keep App Group storage as the first choice for configured team builds; fall back to an owner-only Application Support directory for ad-hoc builds.
-- Grant the sandboxed widget read-only access to that snapshot directory. API keys and OAuth tokens are never written to the widget snapshot.
-- Save provider-page and 30-day chart-metric selections in widget-local preferences without an App Group.
-- Keep the last snapshot available after the app quits. Refreshing provider data requires the app to be running.
-- Set the app and extension marketing version to 0.1.1 and document the fallback.
+Workspace Codex accounts finally report their credits, the spend trend now has every day in it, and the installation docs say what Homebrew really does.
 
-Validation: Xcode build; 98 Swift tests; 48 release-script tests; universal arm64/x86_64 archive and ad-hoc signature verification. On macOS 27.2.1, the installed extension generated medium and large timelines. A separate sandboxed probe using production code verified real snapshot reads, denied writes, paging and metric persistence across processes, refresh notification delivery, and reads after the app quit.
+## Install
 
-Desktop visual rendering and button delivery through chronod remain unverified because the test session lacked Accessibility and screen capture access. The sandboxed probe checks do not replace those UI checks. Compatibility and upgrade behavior may vary by macOS version.
+**Homebrew (recommended)**
 
-The app is not notarized by Apple. After installing in Applications and trying to launch it, macOS may require System Settings → Privacy & Security → Open Anyway.
+```bash
+brew install --cask Shaun-Z/tap/power-notch
+```
 
-Thanks to TheBoredTeam and boringNotch contributors for the original app and architecture, and to lyrimuse, lycrics_notch, MediaRemoteAdapter, and the other projects credited in the README and THIRD_PARTY_LICENSES.]]></description>
-            <enclosure url="https://github.com/Shaun-Z/power.notch/releases/download/v0.1.1/powerNotch.dmg" length="13201987" type="application/octet-stream" sparkle:edSignature="LcBCHqvHiWCFJURk6XDwmpvQjSfZgIoBj0Wnr1+XCPad9g1Z5yqcVQdIQrSEYJjrZ7Nq4N6ptxM6oAZD+968CA=="/>
+> The cask removes the `com.apple.quarantine` attribute from the copy it installs, so macOS skips its ordinary first-launch check and no "Open Anyway" step appears. That is a convenience, not a security guarantee: powerNotch is **not** notarized or Developer ID signed, and this release does not change that.
+
+**DMG**
+
+Download `powerNotch.dmg` from this release, drag **powerNotch.app** into `/Applications`, then allow it once in **System Settings → Privacy & Security → Open Anyway**. The download keeps the quarantine attribute.
+
+## AI Usage
+
+- **Workspace credits are read now.** An education / business / enterprise Codex account answers `has_credits: true` with `balance: null`, so earlier versions drew the quota rings and nothing else. The per-user monthly spend control is read with the same bearer token, and a credit allowance with a stated ceiling is drawn as its own ring next to the session/weekly pool. An uncapped prepaid balance stays a plain amount, the way a top-up reads.
+- **The trend has no holes.** Daily spend now prefers real wallet movement for a day and falls back to the usage-log estimate for days the wallet did not move, so a provider is no longer reduced to the handful of days the app happened to observe. MiMo's token plan keeps its ring and drops the duplicate text balance.
+- **Currencies follow the account.** A history that mixes currencies is converted into the account's own currency with cached daily USD rates, and days recorded before the ledger tracked currency are recovered when the provider's deltas agree on one currency.
+- **1D / 7D / 30D ranges** in the large desktop widget, with hour buckets for the 24-hour view. Tokens, spend, and requests remain switchable per widget.
+- **Kimi** reads its Moonshot wallet alongside the coding-plan windows.
+- **Settings** rows are easier to read: source over account, per-pool reading and countdown in aligned columns, used/limit under the pool name, and a malformed reset timestamp no longer prints "resets in Resetting".
+
+## Docs
+
+- Homebrew is now the primary installation path, with an explicit note about the quarantine attribute it clears and what that does *not* mean.
+- A new **AI Usage** section documents credential sources, quota rings versus balances, pinning a reading beside the closed notch, widget trend ranges, currency handling, and why history can be sparse — the app only knows what this Mac was able to observe.
+
+## Requirements
+
+- macOS **15 Sequoia** or later; native Liquid Glass needs macOS **26** or later.
+- Universal binary: Apple Silicon and Intel.
+- Ad-hoc signed. Updates arrive through Sparkle's stable channel; desktop widgets keep working from the last snapshot while the app is closed.
+
+## Upgrading
+
+`brew upgrade --cask power-notch` (or install the DMG over the existing app). Saved settings are preserved. Usage history that the app never observed is not invented, so charts fill in from the day the app first sees a provider.]]></description>
+            <enclosure url="https://github.com/Shaun-Z/power.notch/releases/download/v0.1.2/powerNotch.dmg" length="13261617" type="application/octet-stream" sparkle:edSignature="HIw8G0qCi3L5NkGYBt1oGNo7Ic+skNSmgD3iLQa09rZzxRb18g/l733FVeQkZiPg6KyNh93piOi9rMBKat8MCQ=="/>
         </item>
     </channel>
 </rss>
