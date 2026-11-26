@@ -420,6 +420,15 @@ class WorkflowSmokeTests(unittest.TestCase):
         self.assertIn('mv "Release/${PROJECT_NAME}.dmg" "Release/${ASSET_NAME}"', self.nightly)
         self.assertNotIn("${APP_NAME}.dmg", self.nightly)
 
+    def test_homebrew_casks_clear_quarantine(self) -> None:
+        # The release pipeline regenerates both tap casks from the template in
+        # release.yml, so the quarantine-clearing postflight must live there or
+        # the next version bump silently drops it.
+        self.assertIn('run "/usr/bin/xattr",', self.release)
+        self.assertIn('args: ["-dr", "com.apple.quarantine", "{{appdir}}/powerNotch.app"]', self.release)
+        self.assertIn("must_succeed: false", self.release)
+        self.assertIn("postflight_steps do", self.release)
+
     def test_stable_and_beta_workflows_are_unchanged(self) -> None:
         # Stable/beta live in release.yml; pin the load-bearing invariants the
         # nightly changes must not disturb.
