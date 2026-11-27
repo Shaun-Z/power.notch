@@ -113,6 +113,34 @@ enum AIUsageWidgetStore {
     private static let chartMetricKey = "aiUsageWidget.large.selectedChartMetric"
     private static let chartRangeKey = "aiUsageWidget.large.selectedChartRange"
 
+    #if WIDGET_PREVIEW_HOST
+    static let previewStoreDidChangeNotification = Notification.Name("AIUsageWidgetPreviewStoreDidChange")
+    static let previewRefreshRequestedNotification = Notification.Name("AIUsageWidgetPreviewRefreshRequested")
+
+    private static let previewLock = NSLock()
+    nonisolated(unsafe) private static var _previewPayloadOverride: AIUsageWidgetPayload?
+
+    static var previewPayloadOverride: AIUsageWidgetPayload? {
+        get { previewLock.withLock { _previewPayloadOverride } }
+        set { previewLock.withLock { _previewPayloadOverride = newValue } }
+    }
+
+    private static func notifyPreviewStoreChanged() {
+        Task { @MainActor in
+            NotificationCenter.default.post(name: previewStoreDidChangeNotification, object: nil)
+        }
+    }
+
+    static func resetPreviewState() {
+        for familyKey in ["small", "medium", "large", "other"] {
+            defaults.removeObject(forKey: pageKey(for: familyKey))
+        }
+        defaults.removeObject(forKey: chartMetricKey)
+        defaults.removeObject(forKey: chartRangeKey)
+        notifyPreviewStoreChanged()
+    }
+    #endif
+
     private static func payloadFileURL() -> URL? {
         AIUsageWidgetSharedConstants.payloadFileURL()
     }
@@ -126,7 +154,7 @@ enum AIUsageWidgetStore {
         "aiUsageWidget.selectedProvider.\(familyKey)"
     }
 
-    static func loadPayload() -> AIUsageWidgetPayload? {
+    static func loadDiskPayload() -> AIUsageWidgetPayload? {
         guard let url = payloadFileURL(),
               let data = try? Data(contentsOf: url)
         else { return nil }
@@ -135,12 +163,24 @@ enum AIUsageWidgetStore {
         return try? decoder.decode(AIUsageWidgetPayload.self, from: data)
     }
 
+    static func loadPayload() -> AIUsageWidgetPayload? {
+        #if WIDGET_PREVIEW_HOST
+        if let override = previewPayloadOverride {
+            return override
+        }
+        #endif
+        return loadDiskPayload()
+    }
+
     static func selectedProviderID(for familyKey: String) -> String? {
         defaults.string(forKey: pageKey(for: familyKey))
     }
 
     static func setSelectedProviderID(_ id: String, for familyKey: String) {
         defaults.set(id, forKey: pageKey(for: familyKey))
+        #if WIDGET_PREVIEW_HOST
+        notifyPreviewStoreChanged()
+        #endif
     }
 
     static func selectedChartMetric() -> AIUsageChartMetric {
@@ -152,6 +192,9 @@ enum AIUsageWidgetStore {
 
     static func setSelectedChartMetric(_ metric: AIUsageChartMetric) {
         defaults.set(metric.rawValue, forKey: chartMetricKey)
+        #if WIDGET_PREVIEW_HOST
+        notifyPreviewStoreChanged()
+        #endif
     }
 
     static func selectedChartRange() -> AIUsageChartRange {
@@ -163,6 +206,9 @@ enum AIUsageWidgetStore {
 
     static func setSelectedChartRange(_ range: AIUsageChartRange) {
         defaults.set(range.rawValue, forKey: chartRangeKey)
+        #if WIDGET_PREVIEW_HOST
+        notifyPreviewStoreChanged()
+        #endif
     }
 
     static func resolvePage(

@@ -1744,7 +1744,7 @@ private enum RelativeTimeFormatter {
     }
 }
 
-#if DEBUG
+#if DEBUG || WIDGET_PREVIEW_HOST
 private enum AIUsageWidgetPreviewFixtures {
     static let baseDate = Date()
 
@@ -2098,28 +2098,35 @@ private enum AIUsageWidgetPreviewFixtures {
 }
 
 private struct WidgetCanvasCard<Content: View>: View {
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorScheme) private var environmentColorScheme
     let accentColor: Color
     let width: CGFloat
     let height: CGFloat
+    var forcedColorScheme: ColorScheme? = .dark
     @ViewBuilder let content: () -> Content
 
     var body: some View {
+        let effectiveScheme = forcedColorScheme ?? environmentColorScheme
         content()
             .background {
                 WidgetAmbientBackground(
                     accentColor: accentColor,
                     renderingMode: .fullColor,
-                    colorScheme: colorScheme
+                    colorScheme: effectiveScheme
                 )
             }
             .frame(width: width, height: height)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                    .strokeBorder(
+                        effectiveScheme == .dark
+                            ? Color.white.opacity(0.08)
+                            : Color.black.opacity(0.08),
+                        lineWidth: 0.5
+                    )
             )
-            .preferredColorScheme(.dark)
+            .environment(\.colorScheme, effectiveScheme)
     }
 }
 
@@ -2312,4 +2319,265 @@ private func makeLargePreviewCard(
     }
     .padding(16)
 }
+
+#if WIDGET_PREVIEW_HOST
+struct PowerNotchWidgetsPreviewGalleryView: View {
+    enum DataSource: String, CaseIterable, Identifiable {
+        case sample = "Sample"
+        case live = "Live Data"
+        case empty = "Empty"
+
+        var id: String { rawValue }
+    }
+
+    enum Appearance: String, CaseIterable, Identifiable {
+        case dark = "Dark"
+        case light = "Light"
+
+        var id: String { rawValue }
+
+        var colorScheme: ColorScheme {
+            self == .dark ? .dark : .light
+        }
+    }
+
+    @State private var dataSource: DataSource = .sample
+    @State private var appearance: Appearance = .dark
+    @State private var showRemaining = true
+    @State private var storeRevision = 0
+    @State private var referenceDate = Date()
+    @State private var lastRefreshAt: Date?
+
+    private var activePayload: AIUsageWidgetPayload? {
+        _ = storeRevision
+        switch dataSource {
+        case .sample:
+            let base = AIUsageWidgetPreviewFixtures.makeLargePayload(now: referenceDate)
+            return AIUsageWidgetPayload(
+                schemaVersion: base.schemaVersion,
+                updatedAt: base.updatedAt,
+                showRemainingPercent: showRemaining,
+                hideAccountEmails: base.hideAccountEmails,
+                providers: base.providers
+            )
+        case .live:
+            return AIUsageWidgetStore.loadDiskPayload()
+        case .empty:
+            return AIUsageWidgetPayload(
+                schemaVersion: AIUsageWidgetSharedConstants.currentSchemaVersion,
+                updatedAt: referenceDate,
+                showRemainingPercent: showRemaining,
+                hideAccountEmails: false,
+                providers: []
+            )
+        }
+    }
+
+    private func syncStoreOverride() {
+        switch dataSource {
+        case .sample:
+            let base = AIUsageWidgetPreviewFixtures.makeLargePayload(now: referenceDate)
+            AIUsageWidgetStore.previewPayloadOverride = AIUsageWidgetPayload(
+                schemaVersion: base.schemaVersion,
+                updatedAt: base.updatedAt,
+                showRemainingPercent: showRemaining,
+                hideAccountEmails: base.hideAccountEmails,
+                providers: base.providers
+            )
+        case .live:
+            AIUsageWidgetStore.previewPayloadOverride = nil
+        case .empty:
+            AIUsageWidgetStore.previewPayloadOverride = AIUsageWidgetPayload(
+                schemaVersion: AIUsageWidgetSharedConstants.currentSchemaVersion,
+                updatedAt: referenceDate,
+                showRemainingPercent: showRemaining,
+                hideAccountEmails: false,
+                providers: []
+            )
+        }
+    }
+
+    var body: some View {
+        let _ = storeRevision
+        let payload = activePayload
+        let providers = payload?.providers ?? []
+        let effectiveShowRemaining = dataSource == .live ? (payload?.showRemainingPercent ?? showRemaining) : showRemaining
+        let metric = AIUsageWidgetStore.selectedChartMetric()
+        let range = AIUsageWidgetStore.selectedChartRange()
+
+        let smallResolved = AIUsageWidgetStore.resolvePage(in: providers, familyKey: "small")
+        let mediumResolved = AIUsageWidgetStore.resolvePage(in: providers, familyKey: "medium")
+        let largeResolved = AIUsageWidgetStore.resolvePage(in: providers, familyKey: "large")
+
+        VStack(spacing: 0) {
+            // Toolbar
+            HStack(spacing: 12) {
+                Picker("Data", selection: $dataSource) {
+                    ForEach(DataSource.allCases) { source in
+                        Text(source.rawValue).tag(source)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 210)
+
+                Picker("Appearance", selection: $appearance) {
+                    ForEach(Appearance.allCases) { item in
+                        Text(item.rawValue).tag(item)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 120)
+
+                Toggle("Remaining %", isOn: $showRemaining)
+                    .toggleStyle(.checkbox)
+                    .disabled(dataSource == .live)
+
+                Spacer()
+
+                if let lastRefreshAt {
+                    Text("Intent Refresh \(lastRefreshAt.formatted(date: .omitted, time: .standard))")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                } else if dataSource == .live && payload == nil {
+                    Text("No local payload file yet")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.orange)
+                }
+
+                Button("Reset") {
+                    AIUsageWidgetStore.resetPreviewState()
+                    lastRefreshAt = nil
+                    referenceDate = Date()
+                    syncStoreOverride()
+                    storeRevision += 1
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.bar)
+
+            Divider()
+
+            // Interactive widget gallery canvas
+            ScrollView([.horizontal, .vertical]) {
+                HStack(alignment: .top, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        widgetSlot(title: "Small · 158×158") {
+                            WidgetCanvasCard(
+                                accentColor: smallResolved?.page.accentColor ?? .accentColor,
+                                width: 158,
+                                height: 158,
+                                forcedColorScheme: appearance.colorScheme
+                            ) {
+                                if let smallResolved {
+                                    SmallProviderPageView(
+                                        page: smallResolved.page,
+                                        allProviders: providers,
+                                        pageIndex: smallResolved.index,
+                                        totalPages: smallResolved.total,
+                                        familyKey: "small",
+                                        showRemaining: effectiveShowRemaining,
+                                        referenceDate: referenceDate
+                                    )
+                                } else {
+                                    EmptyProvidersWidgetView(family: .systemSmall)
+                                }
+                            }
+                        }
+
+                        widgetSlot(title: "Medium · 328×158") {
+                            WidgetCanvasCard(
+                                accentColor: mediumResolved?.page.accentColor ?? .accentColor,
+                                width: 328,
+                                height: 158,
+                                forcedColorScheme: appearance.colorScheme
+                            ) {
+                                if let mediumResolved {
+                                    MediumProviderPageView(
+                                        page: mediumResolved.page,
+                                        allProviders: providers,
+                                        pageIndex: mediumResolved.index,
+                                        totalPages: mediumResolved.total,
+                                        familyKey: "medium",
+                                        showRemaining: effectiveShowRemaining,
+                                        updatedAt: mediumResolved.page.updatedAt ?? payload?.updatedAt,
+                                        referenceDate: referenceDate
+                                    )
+                                } else {
+                                    EmptyProvidersWidgetView(family: .systemMedium)
+                                }
+                            }
+                        }
+                    }
+
+                    widgetSlot(title: "Large · 328×326") {
+                        WidgetCanvasCard(
+                            accentColor: largeResolved?.page.accentColor ?? .accentColor,
+                            width: 328,
+                            height: 326,
+                            forcedColorScheme: appearance.colorScheme
+                        ) {
+                            if let largeResolved {
+                                LargeProviderPageView(
+                                    page: largeResolved.page,
+                                    allProviders: providers,
+                                    pageIndex: largeResolved.index,
+                                    totalPages: largeResolved.total,
+                                    familyKey: "large",
+                                    showRemaining: effectiveShowRemaining,
+                                    selectedChartMetric: metric,
+                                    selectedChartRange: range,
+                                    updatedAt: largeResolved.page.updatedAt ?? payload?.updatedAt,
+                                    referenceDate: referenceDate
+                                )
+                            } else {
+                                EmptyProvidersWidgetView(family: .systemLarge)
+                            }
+                        }
+                    }
+                }
+                .padding(24)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(
+                appearance == .dark
+                    ? Color(red: 0.04, green: 0.05, blue: 0.07)
+                    : Color(red: 0.88, green: 0.90, blue: 0.93)
+            )
+        }
+        .preferredColorScheme(appearance.colorScheme)
+        .onAppear {
+            syncStoreOverride()
+        }
+        .onChange(of: dataSource) { _, _ in
+            syncStoreOverride()
+            storeRevision += 1
+        }
+        .onChange(of: showRemaining) { _, _ in
+            syncStoreOverride()
+            storeRevision += 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AIUsageWidgetStore.previewStoreDidChangeNotification)) { _ in
+            storeRevision += 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AIUsageWidgetStore.previewRefreshRequestedNotification)) { _ in
+            referenceDate = Date()
+            lastRefreshAt = referenceDate
+            syncStoreOverride()
+            storeRevision += 1
+        }
+    }
+
+    private func widgetSlot<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
+            content()
+        }
+    }
+}
+#endif
 #endif
