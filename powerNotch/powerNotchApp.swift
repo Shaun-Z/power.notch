@@ -12,32 +12,45 @@ import KeyboardShortcuts
 import Sparkle
 import SwiftUI
 
+private var isRunningForXcodePreviews: Bool {
+    let env = ProcessInfo.processInfo.environment
+    return env["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+        || env["XCODE_RUNNING_FOR_PLAYGROUNDS"] == "1"
+}
+
 @main
 struct DynamicNotchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Default(.menubarIcon) var showMenuBarIcon
     @Environment(\.openWindow) var openWindow
 
-    let updaterController: SPUStandardUpdaterController
+    let updaterController: SPUStandardUpdaterController?
 
     init() {
+        if isRunningForXcodePreviews {
+            updaterController = nil
+            return
+        }
         LiquidGlassAppearance.configure()
-        updaterController = SPUStandardUpdaterController(
+        let controller = SPUStandardUpdaterController(
             startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        updaterController = controller
 
         // Initialize the settings window controller with the updater controller
-        SettingsWindowController.shared.setUpdaterController(updaterController)
+        SettingsWindowController.shared.setUpdaterController(controller)
     }
 
     var body: some Scene {
-        MenuBarExtra("powerNotch", image: "MenuBarIcon", isInserted: $showMenuBarIcon) {
+        MenuBarExtra("powerNotch", image: "MenuBarIcon", isInserted: isRunningForXcodePreviews ? .constant(false) : $showMenuBarIcon) {
             Button("Settings") {
                 DispatchQueue.main.async {
                     SettingsWindowController.shared.showWindow()
                 }
             }
             .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
-            CheckForUpdatesView(updater: updaterController.updater)
+            if let updaterController {
+                CheckForUpdatesView(updater: updaterController.updater)
+            }
             Divider()
             Button("Restart powerNotch") {
                 ApplicationRelauncher.restart()
@@ -50,12 +63,13 @@ struct DynamicNotchApp: App {
     }
 }
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var windows: [String: NSWindow] = [:] // UUID -> NSWindow
     var viewModels: [String: BoringViewModel] = [:] // UUID -> BoringViewModel
-    @ObservedObject var coordinator = BoringViewCoordinator.shared
-    var quickShareService = QuickShareService.shared
+    private lazy var coordinator = BoringViewCoordinator.shared
+    private lazy var quickShareService = QuickShareService.shared
     var whatsNewWindow: NSWindow?
     var timer: Timer?
     var closeNotchTask: Task<Void, Never>?
@@ -72,6 +86,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        guard !isRunningForXcodePreviews else { return }
         LiquidGlassAppearance.stop()
         NotificationCenter.default.removeObserver(self)
         if let observer = screenLockedObserver {
@@ -269,6 +284,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !isRunningForXcodePreviews else { return }
+        _ = quickShareService
         isScreenLocked = coordinator.isScreenLocked
 
         NotificationCenter.default.addObserver(

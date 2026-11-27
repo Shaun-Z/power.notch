@@ -13,6 +13,7 @@ import WidgetKit
 struct AIUsageWidgetTurnPageIntent: AppIntent {
     static var title: LocalizedStringResource = "Turn AI Usage Page"
     static var description = IntentDescription("Switch to the next or previous configured AI provider in the desktop widget.")
+    static var isDiscoverable: Bool { false }
 
     @Parameter(title: "Step")
     var step: Int
@@ -40,6 +41,7 @@ struct AIUsageWidgetTurnPageIntent: AppIntent {
 struct AIUsageWidgetSelectProviderIntent: AppIntent {
     static var title: LocalizedStringResource = "Select AI Provider Page"
     static var description = IntentDescription("Jump directly to a specific configured AI provider page in the desktop widget.")
+    static var isDiscoverable: Bool { false }
 
     @Parameter(title: "Provider ID")
     var providerID: String
@@ -67,6 +69,7 @@ struct AIUsageWidgetSelectProviderIntent: AppIntent {
 struct AIUsageWidgetSelectChartMetricIntent: AppIntent {
     static var title: LocalizedStringResource = "Select 30-Day Chart Metric"
     static var description = IntentDescription("Switch the 30-day usage line chart between Tokens, Spend, and Requests.")
+    static var isDiscoverable: Bool { false }
 
     @Parameter(title: "Metric")
     var metricRaw: String
@@ -91,6 +94,7 @@ struct AIUsageWidgetSelectChartMetricIntent: AppIntent {
 struct AIUsageWidgetSelectChartRangeIntent: AppIntent {
     static var title: LocalizedStringResource = "Select Trend Range"
     static var description = IntentDescription("Switch the usage line chart between 24 hours, 7 days, and 30 days.")
+    static var isDiscoverable: Bool { false }
 
     @Parameter(title: "Range")
     var rangeRaw: String
@@ -115,6 +119,7 @@ struct AIUsageWidgetSelectChartRangeIntent: AppIntent {
 struct AIUsageWidgetRefreshIntent: AppIntent {
     static var title: LocalizedStringResource = "Refresh AI Usage"
     static var description = IntentDescription("Request PowerNotch to refresh AI usage data.")
+    static var isDiscoverable: Bool { false }
 
     init() {}
 

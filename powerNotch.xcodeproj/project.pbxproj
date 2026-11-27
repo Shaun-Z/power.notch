@@ -391,12 +391,21 @@
 			);
 			target = 9B9763E830B2E91F00CCA45B /* PowerNotchWidgetsExtension */;
 		};
+		A19000000000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				AIUsageWidgetIntents.swift,
+				AIUsageWidgetModels.swift,
+				PowerNotchWidgets.swift,
+			);
+			target = 14CEF4112C5CAED300855D72 /* powerNotch */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		112FB72F2CCF12CC0015238C /* private */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = private; sourceTree = "<group>"; };
 		11F748502EC9AABA00F841DB /* PowerNotchXPCHelper */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (11F7485C2EC9AABA00F841DB /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = PowerNotchXPCHelper; sourceTree = "<group>"; };
-		9B9763EE30B2E92000CCA45B /* PowerNotchWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (9B9763FC30B2E92100CCA45B /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = PowerNotchWidgets; sourceTree = "<group>"; };
+		9B9763EE30B2E92000CCA45B /* PowerNotchWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (9B9763FC30B2E92100CCA45B /* PBXFileSystemSynchronizedBuildFileExceptionSet */, A19000000000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = PowerNotchWidgets; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */

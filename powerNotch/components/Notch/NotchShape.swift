@@ -1185,14 +1185,18 @@ struct NotchLiquidGlassRim: View {
                 let maxDim = max(geo.size.width, geo.size.height, 1)
                 let notchBottomY = max(0.45, (geo.size.height - canvasBleed) / max(geo.size.height, 1))
 
+                let stop1 = min(0.42, max(0.08, 0.25 + drift * 0.6))
+                let stop3 = max(0.58, min(0.92, 0.75 + drift * 0.6))
+                let stop2 = min(stop3 - 0.01, max(stop1 + 0.01, 0.50 - drift * 0.45))
+
                 ZStack {
                     // Flowing themed specular base gradient
                     LinearGradient(
                         stops: [
                             .init(color: (isCausticPass ? palette.deepGlow : palette.highlight).opacity(isCausticPass ? 0.34 : 0.54), location: 0.0),
-                            .init(color: palette.primary.opacity(isCausticPass ? 0.58 : 0.42), location: max(0.08, 0.25 + drift * 0.6)),
-                            .init(color: palette.harmonic.opacity(isCausticPass ? 0.72 : 0.56), location: max(0.15, min(0.85, 0.50 - drift * 0.8))),
-                            .init(color: palette.primary.opacity(isCausticPass ? 0.58 : 0.44), location: min(0.92, 0.75 + drift * 0.6)),
+                            .init(color: palette.primary.opacity(isCausticPass ? 0.58 : 0.42), location: stop1),
+                            .init(color: palette.harmonic.opacity(isCausticPass ? 0.72 : 0.56), location: stop2),
+                            .init(color: palette.primary.opacity(isCausticPass ? 0.58 : 0.44), location: stop3),
                             .init(color: (isCausticPass ? palette.deepGlow : palette.highlight).opacity(isCausticPass ? 0.34 : 0.68), location: 1.0)
                         ],
                         startPoint: .topLeading,
