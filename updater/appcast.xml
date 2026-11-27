@@ -3,28 +3,22 @@
     <channel>
         <title>powerNotch</title>
         <item>
-            <title>0.1.3</title>
-            <pubDate>Fri, 27 Nov 2026 08:42:43 +0000</pubDate>
+            <title>0.1.4</title>
+            <pubDate>Fri, 27 Nov 2026 10:30:19 +0000</pubDate>
             <link>https://github.com/Shaun-Z/power.notch/releases</link>
-            <sparkle:version>275</sparkle:version>
-            <sparkle:shortVersionString>0.1.3</sparkle:shortVersionString>
+            <sparkle:version>276</sparkle:version>
+            <sparkle:shortVersionString>0.1.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <description><![CDATA[## Summary
-- **Desktop Large Widget Vertical Layout (`PowerNotchWidgets.swift`)**:
-  - Merge the `1D / 7D / 30D` range selector into the trend card header row (`Trend [1D|7D|30D] ... Today/Last · Peak`) and switch the `Tokens / Spend / Reqs` pills to compact single-row chips.
-  - Lay out 2-pool quota cards horizontally (ring on the left, label + 7d percentage on the right) and tighten 1-pool, 3–4-pool, balance, and empty-data quota sections as well as outer/switcher paddings.
-  - Add a height-adaptive Y-axis (`minHeight: 56`, 3 ticks when `height >= 64` or 2 ticks when compact), trimmed integer axis currency formatting (e.g. `≈$50`, `≈$25`), top chart padding, and edge-anchored non-truncating X-axis labels (`Today` / `Now`).
-- **Notch Liquid Glass Fix (`NotchShape.swift`)**:
-  - Bound and clamp the three dynamic `LinearGradient` stop locations (`0.0 < stop1 < stop2 < stop3 < 1.0`) so sine-wave drift never crosses stops or triggers Debug `Gradient stop locations must be ordered.` assertions.
-- **macOS Xcode Canvas Previews (`project.pbxproj`, `AIUsageWidgetIntents.swift`, `powerNotchApp.swift`, `PowerNotchWidgets.swift`)**:
-  - Share `PowerNotchWidgets.swift`, `AIUsageWidgetModels.swift`, and `AIUsageWidgetIntents.swift` with the `powerNotch` app target via `PBXFileSystemSynchronizedBuildFileExceptionSet` so widget views can be previewed natively on macOS in Xcode Canvas.
-  - Mark internal widget `AppIntent` types with `isDiscoverable = false` and guard `DynamicNotchApp` / `AppDelegate` startup when running under Xcode Previews (`XCODE_RUNNING_FOR_PREVIEWS` / `XCODE_RUNNING_FOR_PLAYGROUNDS`).
+- Removed the `powerNotch` target membership exception on `PowerNotchWidgets` in `project.pbxproj` so `AIUsageWidgetIntents.swift`, `AIUsageWidgetModels.swift`, and `PowerNotchWidgets.swift` are no longer compiled into the main `powerNotch.app` target (eliminating duplicate `Metadata.appintents/extract.actionsdata` in `powerNotch.app`).
+- Added a standalone, non-shipped `PowerNotchWidgetsPreviewHost` macOS app target (`SKIP_INSTALL = YES`, `WIDGET_PREVIEW_HOST` compilation condition) for live Xcode Canvas `#Preview` rendering and standalone interactive widget previews without polluting `powerNotch.app` or Release archives.
+- Added `#if WIDGET_PREVIEW_HOST` preview store hooks and `PowerNotchWidgetsPreviewGalleryView` so Small / Medium / Large widgets can be previewed side-by-side with working in-widget `AppIntent` buttons (paging, chart range/metric switching, refresh) and Sample / Live / Empty / Dark / Light toggles.
 
 ## Verification
-- `python3 -m unittest discover -s .github/scripts/tests -v`: 59 tests passed.
-- `swift test`: 10 tests (`NetEaseMusicTests`) + 121 tests in 17 suites (`AIUsageCoreTests`) passed.
-- `xcodebuild -project powerNotch.xcodeproj -scheme powerNotch -configuration Release ... build`: `** BUILD SUCCEEDED **`.]]></description>
-            <enclosure url="https://github.com/Shaun-Z/power.notch/releases/download/v0.1.3/powerNotch.dmg" length="13600862" type="application/octet-stream" sparkle:edSignature="5g/UOnXBr/PkAS7A2DPzS4io66kRvN1gp1ZOLPckSTBR/ua91qj4Nf7WPO/T9rnN36T+2P5nN4G6XFDMF8WwAA=="/>
+- Built `PowerNotchWidgetsPreviewHost` scheme with 0 errors and verified Xcode Canvas `RenderPreview` on `PowerNotchWidgets.swift` (`Large · Interactive`).
+- Built `powerNotch` scheme with 0 errors and confirmed `powerNotch.app` contains neither `Metadata.appintents` nor `PowerNotchWidgetsPreviewHost`, while `PowerNotchWidgetsExtension.appex` retains `Metadata.appintents/extract.actionsdata`.
+- Passed `.github/scripts/tests` and `swift test` (121 tests / 17 suites).]]></description>
+            <enclosure url="https://github.com/Shaun-Z/power.notch/releases/download/v0.1.4/powerNotch.dmg" length="13281022" type="application/octet-stream" sparkle:edSignature="rRm7Eypl3Lr7A6N8SUtTtetcO9tghsiNkmL1UPqm9JO3sZ2HaL52vi3RNyr3Q10d64tgk80qKjJWVym7Cug/Ag=="/>
         </item>
     </channel>
 </rss>
