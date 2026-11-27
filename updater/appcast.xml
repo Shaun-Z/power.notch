@@ -3,54 +3,28 @@
     <channel>
         <title>powerNotch</title>
         <item>
-            <title>0.1.2</title>
-            <pubDate>Thu, 26 Nov 2026 08:24:59 +0000</pubDate>
+            <title>0.1.3</title>
+            <pubDate>Fri, 27 Nov 2026 08:42:43 +0000</pubDate>
             <link>https://github.com/Shaun-Z/power.notch/releases</link>
-            <sparkle:version>274</sparkle:version>
-            <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
+            <sparkle:version>275</sparkle:version>
+            <sparkle:shortVersionString>0.1.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[# powerNotch 0.1.2
+            <description><![CDATA[## Summary
+- **Desktop Large Widget Vertical Layout (`PowerNotchWidgets.swift`)**:
+  - Merge the `1D / 7D / 30D` range selector into the trend card header row (`Trend [1D|7D|30D] ... Today/Last · Peak`) and switch the `Tokens / Spend / Reqs` pills to compact single-row chips.
+  - Lay out 2-pool quota cards horizontally (ring on the left, label + 7d percentage on the right) and tighten 1-pool, 3–4-pool, balance, and empty-data quota sections as well as outer/switcher paddings.
+  - Add a height-adaptive Y-axis (`minHeight: 56`, 3 ticks when `height >= 64` or 2 ticks when compact), trimmed integer axis currency formatting (e.g. `≈$50`, `≈$25`), top chart padding, and edge-anchored non-truncating X-axis labels (`Today` / `Now`).
+- **Notch Liquid Glass Fix (`NotchShape.swift`)**:
+  - Bound and clamp the three dynamic `LinearGradient` stop locations (`0.0 < stop1 < stop2 < stop3 < 1.0`) so sine-wave drift never crosses stops or triggers Debug `Gradient stop locations must be ordered.` assertions.
+- **macOS Xcode Canvas Previews (`project.pbxproj`, `AIUsageWidgetIntents.swift`, `powerNotchApp.swift`, `PowerNotchWidgets.swift`)**:
+  - Share `PowerNotchWidgets.swift`, `AIUsageWidgetModels.swift`, and `AIUsageWidgetIntents.swift` with the `powerNotch` app target via `PBXFileSystemSynchronizedBuildFileExceptionSet` so widget views can be previewed natively on macOS in Xcode Canvas.
+  - Mark internal widget `AppIntent` types with `isDiscoverable = false` and guard `DynamicNotchApp` / `AppDelegate` startup when running under Xcode Previews (`XCODE_RUNNING_FOR_PREVIEWS` / `XCODE_RUNNING_FOR_PLAYGROUNDS`).
 
-Workspace Codex accounts finally report their credits, the spend trend now has every day in it, and the installation docs say what Homebrew really does.
-
-## Install
-
-**Homebrew (recommended)**
-
-```bash
-brew install --cask Shaun-Z/tap/power-notch
-```
-
-> The cask removes the `com.apple.quarantine` attribute from the copy it installs, so macOS skips its ordinary first-launch check and no "Open Anyway" step appears. That is a convenience, not a security guarantee: powerNotch is **not** notarized or Developer ID signed, and this release does not change that.
-
-**DMG**
-
-Download `powerNotch.dmg` from this release, drag **powerNotch.app** into `/Applications`, then allow it once in **System Settings → Privacy & Security → Open Anyway**. The download keeps the quarantine attribute.
-
-## AI Usage
-
-- **Workspace credits are read now.** An education / business / enterprise Codex account answers `has_credits: true` with `balance: null`, so earlier versions drew the quota rings and nothing else. The per-user monthly spend control is read with the same bearer token, and a credit allowance with a stated ceiling is drawn as its own ring next to the session/weekly pool. An uncapped prepaid balance stays a plain amount, the way a top-up reads.
-- **The trend has no holes.** Daily spend now prefers real wallet movement for a day and falls back to the usage-log estimate for days the wallet did not move, so a provider is no longer reduced to the handful of days the app happened to observe. MiMo's token plan keeps its ring and drops the duplicate text balance.
-- **Currencies follow the account.** A history that mixes currencies is converted into the account's own currency with cached daily USD rates, and days recorded before the ledger tracked currency are recovered when the provider's deltas agree on one currency.
-- **1D / 7D / 30D ranges** in the large desktop widget, with hour buckets for the 24-hour view. Tokens, spend, and requests remain switchable per widget.
-- **Kimi** reads its Moonshot wallet alongside the coding-plan windows.
-- **Settings** rows are easier to read: source over account, per-pool reading and countdown in aligned columns, used/limit under the pool name, and a malformed reset timestamp no longer prints "resets in Resetting".
-
-## Docs
-
-- Homebrew is now the primary installation path, with an explicit note about the quarantine attribute it clears and what that does *not* mean.
-- A new **AI Usage** section documents credential sources, quota rings versus balances, pinning a reading beside the closed notch, widget trend ranges, currency handling, and why history can be sparse — the app only knows what this Mac was able to observe.
-
-## Requirements
-
-- macOS **15 Sequoia** or later; native Liquid Glass needs macOS **26** or later.
-- Universal binary: Apple Silicon and Intel.
-- Ad-hoc signed. Updates arrive through Sparkle's stable channel; desktop widgets keep working from the last snapshot while the app is closed.
-
-## Upgrading
-
-`brew upgrade --cask power-notch` (or install the DMG over the existing app). Saved settings are preserved. Usage history that the app never observed is not invented, so charts fill in from the day the app first sees a provider.]]></description>
-            <enclosure url="https://github.com/Shaun-Z/power.notch/releases/download/v0.1.2/powerNotch.dmg" length="13261617" type="application/octet-stream" sparkle:edSignature="HIw8G0qCi3L5NkGYBt1oGNo7Ic+skNSmgD3iLQa09rZzxRb18g/l733FVeQkZiPg6KyNh93piOi9rMBKat8MCQ=="/>
+## Verification
+- `python3 -m unittest discover -s .github/scripts/tests -v`: 59 tests passed.
+- `swift test`: 10 tests (`NetEaseMusicTests`) + 121 tests in 17 suites (`AIUsageCoreTests`) passed.
+- `xcodebuild -project powerNotch.xcodeproj -scheme powerNotch -configuration Release ... build`: `** BUILD SUCCEEDED **`.]]></description>
+            <enclosure url="https://github.com/Shaun-Z/power.notch/releases/download/v0.1.3/powerNotch.dmg" length="13600862" type="application/octet-stream" sparkle:edSignature="5g/UOnXBr/PkAS7A2DPzS4io66kRvN1gp1ZOLPckSTBR/ua91qj4Nf7WPO/T9rnN36T+2P5nN4G6XFDMF8WwAA=="/>
         </item>
     </channel>
 </rss>
