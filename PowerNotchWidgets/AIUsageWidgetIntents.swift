@@ -130,6 +130,14 @@ struct AIUsageWidgetRefreshIntent: AppIntent {
             userInfo: nil,
             deliverImmediately: true
         )
+        #if WIDGET_PREVIEW_HOST
+        Task { @MainActor in
+            NotificationCenter.default.post(
+                name: AIUsageWidgetStore.previewRefreshRequestedNotification,
+                object: nil
+            )
+        }
+        #endif
         WidgetCenter.shared.reloadTimelines(ofKind: AIUsageWidgetConstants.widgetKind)
         return .result()
     }

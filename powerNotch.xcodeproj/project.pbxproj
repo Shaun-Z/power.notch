@@ -161,6 +161,10 @@
 		A17000000000000000000013 /* AIUsageRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000003 /* AIUsageRefreshCoordinator.swift */; };
 		A17000000000000000000014 /* AIUsageHistoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000001 /* AIUsageHistoryModels.swift */; };
 		A17000000000000000000017 /* CurrencyRates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000005 /* CurrencyRates.swift */; };
+		A1A00000000000000000000B /* AIUsageHistoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000001 /* AIUsageHistoryModels.swift */; };
+		A1A00000000000000000000C /* CurrencyRates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000005 /* CurrencyRates.swift */; };
+		A1A00000000000000000000D /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B9763EC30B2E91F00CCA45B /* SwiftUI.framework */; };
+		A1A00000000000000000000E /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B9763EA30B2E91F00CCA45B /* WidgetKit.framework */; };
 		A17000000000000000000015 /* CodexCredits.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000004 /* CodexCredits.swift */; };
 		A17000000000000000000016 /* CurrencyRates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000005 /* CurrencyRates.swift */; };
 		A17000000000000000000018 /* TrendWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000000000000000000006 /* TrendWindow.swift */; };
@@ -335,6 +339,7 @@
 		9B9763D630B0381A00CCA45B /* NotchAIUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchAIUsageView.swift; sourceTree = "<group>"; };
 		9B9763D830B0384300CCA45B /* AIUsageSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIUsageSettingsView.swift; sourceTree = "<group>"; };
 		9B9763E930B2E91F00CCA45B /* PowerNotchWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PowerNotchWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1A000000000000000000001 /* PowerNotchWidgetsPreviewHost.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PowerNotchWidgetsPreviewHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9B9763EA30B2E91F00CCA45B /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = /System/Library/Frameworks/WidgetKit.framework; sourceTree = "<absolute>"; };
 		9B9763EC30B2E91F00CCA45B /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };
 		9B9763FE30B2E94000CCA45B /* PowerNotchWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PowerNotchWidgetsExtension.entitlements; sourceTree = "<group>"; };
@@ -391,21 +396,21 @@
 			);
 			target = 9B9763E830B2E91F00CCA45B /* PowerNotchWidgetsExtension */;
 		};
-		A19000000000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		A1A000000000000000000003 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				AIUsageWidgetIntents.swift,
-				AIUsageWidgetModels.swift,
-				PowerNotchWidgets.swift,
+				Info.plist,
+				PowerNotchWidgetsBundle.swift,
 			);
-			target = 14CEF4112C5CAED300855D72 /* powerNotch */;
+			target = A1A000000000000000000007 /* PowerNotchWidgetsPreviewHost */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		112FB72F2CCF12CC0015238C /* private */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = private; sourceTree = "<group>"; };
 		11F748502EC9AABA00F841DB /* PowerNotchXPCHelper */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (11F7485C2EC9AABA00F841DB /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = PowerNotchXPCHelper; sourceTree = "<group>"; };
-		9B9763EE30B2E92000CCA45B /* PowerNotchWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (9B9763FC30B2E92100CCA45B /* PBXFileSystemSynchronizedBuildFileExceptionSet */, A19000000000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = PowerNotchWidgets; sourceTree = "<group>"; };
+		9B9763EE30B2E92000CCA45B /* PowerNotchWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (9B9763FC30B2E92100CCA45B /* PBXFileSystemSynchronizedBuildFileExceptionSet */, A1A000000000000000000003 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = PowerNotchWidgets; sourceTree = "<group>"; };
+		A1A000000000000000000002 /* PowerNotchWidgetsPreviewHost */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = PowerNotchWidgetsPreviewHost; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -440,6 +445,15 @@
 			files = (
 				9B9763ED30B2E91F00CCA45B /* SwiftUI.framework in Frameworks */,
 				9B9763EB30B2E91F00CCA45B /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1A000000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1A00000000000000000000D /* SwiftUI.framework in Frameworks */,
+				A1A00000000000000000000E /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -641,6 +655,7 @@
 				14CEF4142C5CAED300855D72 /* powerNotch */,
 				11F748502EC9AABA00F841DB /* PowerNotchXPCHelper */,
 				9B9763EE30B2E92000CCA45B /* PowerNotchWidgets */,
+				A1A000000000000000000002 /* PowerNotchWidgetsPreviewHost */,
 				14CEF4132C5CAED300855D72 /* Products */,
 				14D031EC2C689DB70096E6A1 /* Frameworks */,
 			);
@@ -652,6 +667,7 @@
 				14CEF4122C5CAED300855D72 /* powerNotch.app */,
 				11F7484F2EC9AABA00F841DB /* PowerNotchXPCHelper.xpc */,
 				9B9763E930B2E91F00CCA45B /* PowerNotchWidgetsExtension.appex */,
+				A1A000000000000000000001 /* PowerNotchWidgetsPreviewHost.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -971,6 +987,29 @@
 			productReference = 9B9763E930B2E91F00CCA45B /* PowerNotchWidgetsExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		A1A000000000000000000007 /* PowerNotchWidgetsPreviewHost */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1A000000000000000000008 /* Build configuration list for PBXNativeTarget "PowerNotchWidgetsPreviewHost" */;
+			buildPhases = (
+				A1A000000000000000000004 /* Sources */,
+				A1A000000000000000000005 /* Frameworks */,
+				A1A000000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				9B9763EE30B2E92000CCA45B /* PowerNotchWidgets */,
+				A1A000000000000000000002 /* PowerNotchWidgetsPreviewHost */,
+			);
+			name = PowerNotchWidgetsPreviewHost;
+			packageProductDependencies = (
+			);
+			productName = PowerNotchWidgetsPreviewHost;
+			productReference = A1A000000000000000000001 /* PowerNotchWidgetsPreviewHost.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -989,6 +1028,9 @@
 						LastSwiftMigration = 1540;
 					};
 					9B9763E830B2E91F00CCA45B = {
+						CreatedOnToolsVersion = 27.2;
+					};
+					A1A000000000000000000007 = {
 						CreatedOnToolsVersion = 27.2;
 					};
 				};
@@ -1022,6 +1064,7 @@
 				14CEF4112C5CAED300855D72 /* powerNotch */,
 				11F7484E2EC9AABA00F841DB /* PowerNotchXPCHelper */,
 				9B9763E830B2E91F00CCA45B /* PowerNotchWidgetsExtension */,
+				A1A000000000000000000007 /* PowerNotchWidgetsPreviewHost */,
 			);
 		};
 /* End PBXProject section */
@@ -1047,6 +1090,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		9B9763E730B2E91F00CCA45B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1A000000000000000000006 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1212,6 +1262,15 @@
 			files = (
 				A17000000000000000000014 /* AIUsageHistoryModels.swift in Sources */,
 				A17000000000000000000017 /* CurrencyRates.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1A000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1A00000000000000000000B /* AIUsageHistoryModels.swift in Sources */,
+				A1A00000000000000000000C /* CurrencyRates.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1589,6 +1648,77 @@
 			};
 			name = Release;
 		};
+		A1A000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 275;
+				DEVELOPMENT_TEAM = 877W5ZP5WY;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "PowerNotch Widgets Preview";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = "0.1.3";
+				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchWidgetsPreviewHost;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG WIDGET_PREVIEW_HOST $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A1A00000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 275;
+				DEVELOPMENT_TEAM = 877W5ZP5WY;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "PowerNotch Widgets Preview";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = "0.1.3";
+				PRODUCT_BUNDLE_IDENTIFIER = com.powernotch.app.PowerNotchWidgetsPreviewHost;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "WIDGET_PREVIEW_HOST $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1627,6 +1757,15 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
+		};
+		A1A000000000000000000008 /* Build configuration list for PBXNativeTarget "PowerNotchWidgetsPreviewHost" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1A000000000000000000009 /* Debug */,
+				A1A00000000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 
