@@ -602,14 +602,14 @@ private struct LargeProviderPageView: View {
     let referenceDate: Date
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 7) {
             // Top bar
             HStack(alignment: .center, spacing: 8) {
-                ProviderHeaderBadge(page: page, iconSize: 14, boxSize: 26)
+                ProviderHeaderBadge(page: page, iconSize: 13.5, boxSize: 24)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(page.displayName)
-                        .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .layoutPriority(1)
@@ -617,7 +617,7 @@ private struct LargeProviderPageView: View {
                     HStack(spacing: 5) {
                         if let plan = page.planName, !plan.isEmpty {
                             Text(plan)
-                                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                .font(.system(size: 8.5, weight: .semibold, design: .rounded))
                                 .foregroundStyle(page.accentColor)
                                 .padding(.horizontal, 5.5)
                                 .padding(.vertical, 1)
@@ -625,14 +625,14 @@ private struct LargeProviderPageView: View {
                                 .lineLimit(1)
                         } else if let src = page.sourceLabel, !src.isEmpty {
                             Text(src)
-                                .font(.system(size: 9, weight: .medium, design: .rounded))
+                                .font(.system(size: 8.5, weight: .medium, design: .rounded))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
 
                         if let updatedAt {
                             Text("Updated \(RelativeTimeFormatter.short(from: updatedAt, now: referenceDate))")
-                                .font(.system(size: 9, weight: .medium, design: .rounded))
+                                .font(.system(size: 8.5, weight: .medium, design: .rounded))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
@@ -662,7 +662,7 @@ private struct LargeProviderPageView: View {
             // Upper Section: Compact Rings (or Direct Numeric Balance — Zero Duplication)
             largeUpperQuotaSection
 
-            // Lower Section: 30-Day Tokens / Spend / Requests Line Chart
+            // Lower Section: Tokens / Spend / Requests Line Chart
             LargeTrendCard(
                 page: page,
                 selectedMetric: selectedChartMetric,
@@ -670,6 +670,7 @@ private struct LargeProviderPageView: View {
                 referenceDate: referenceDate
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .layoutPriority(1)
 
             // Bottom Interactive Provider Selector Dock
             if totalPages > 1 {
@@ -680,7 +681,8 @@ private struct LargeProviderPageView: View {
                 )
             }
         }
-        .padding(14)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -691,15 +693,15 @@ private struct LargeProviderPageView: View {
                 WidgetRingGroupGauge(
                     page: page,
                     group: group,
-                    size: 78,
-                    outerLineWidth: 7.2,
-                    innerLineWidth: 5.6,
-                    ringGap: 3.6,
+                    size: 64,
+                    outerLineWidth: 6.2,
+                    innerLineWidth: 4.8,
+                    ringGap: 3.0,
                     showRemaining: showRemaining,
                     showCenterSubtitle: true
                 )
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4.5) {
                     // Outer ring metadata (percentage already centered in ring -> show label + reset)
                     HStack(spacing: 5) {
                         Circle()
@@ -771,38 +773,95 @@ private struct LargeProviderPageView: View {
                             }
                         }
                         .padding(.horizontal, 7)
-                        .padding(.vertical, 2.5)
+                        .padding(.vertical, 2)
                         .background(Capsule().fill(page.accentColor.opacity(0.14)))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .fill(Color.primary.opacity(0.045))
             )
-        } else if page.ringGroups.count > 1 {
+        } else if page.ringGroups.count == 2 {
+            HStack(spacing: 8) {
+                ForEach(Array(page.ringGroups.enumerated()), id: \.element.id) { index, group in
+                    if index > 0 {
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.08))
+                            .frame(width: 0.5, height: 34)
+                    }
+                    HStack(spacing: 8) {
+                        WidgetRingGroupGauge(
+                            page: page,
+                            group: group,
+                            size: 56,
+                            outerLineWidth: 5.4,
+                            innerLineWidth: 4.2,
+                            ringGap: 2.6,
+                            showRemaining: showRemaining,
+                            showCenterSubtitle: false
+                        )
+
+                        VStack(alignment: .leading, spacing: 2.5) {
+                            Text(group.label)
+                                .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+
+                            if let inner = group.innerWindow {
+                                let iPct = Int(inner.displayPercent(showRemaining: showRemaining).rounded())
+                                HStack(spacing: 3) {
+                                    Circle()
+                                        .fill(page.innerRingColor(for: inner))
+                                        .frame(width: 4.5, height: 4.5)
+                                        .widgetAccentable()
+                                    Text("7d \(iPct)%")
+                                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            } else if let reset = group.outerWindow.resetCountdownText(referenceDate: referenceDate) {
+                                Text(reset)
+                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color.primary.opacity(0.045))
+            )
+        } else if page.ringGroups.count > 2 {
             let visibleGroups = Array(page.ringGroups.prefix(4))
-            let ringSize: CGFloat = visibleGroups.count == 2 ? 66 : (visibleGroups.count == 3 ? 60 : 50)
-            HStack(spacing: visibleGroups.count <= 3 ? 10 : 6) {
+            let ringSize: CGFloat = visibleGroups.count == 3 ? 48 : 44
+            HStack(spacing: visibleGroups.count == 3 ? 10 : 6) {
                 ForEach(visibleGroups) { group in
-                    VStack(spacing: 3.5) {
+                    VStack(spacing: 2) {
                         WidgetRingGroupGauge(
                             page: page,
                             group: group,
                             size: ringSize,
-                            outerLineWidth: visibleGroups.count <= 3 ? 5.8 : 4.8,
-                            innerLineWidth: visibleGroups.count <= 3 ? 4.4 : 3.6,
-                            ringGap: visibleGroups.count <= 3 ? 2.8 : 2.2,
+                            outerLineWidth: visibleGroups.count == 3 ? 4.6 : 4.2,
+                            innerLineWidth: visibleGroups.count == 3 ? 3.6 : 3.2,
+                            ringGap: visibleGroups.count == 3 ? 2.2 : 2.0,
                             showRemaining: showRemaining,
                             showCenterSubtitle: false
                         )
 
                         Text(group.label)
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.68)
@@ -816,13 +875,13 @@ private struct LargeProviderPageView: View {
                                     .frame(width: 4.5, height: 4.5)
                                     .widgetAccentable()
                                 Text("7d \(iPct)%")
-                                    .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
+                                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
                         } else if let reset = group.outerWindow.resetCountdownText(referenceDate: referenceDate) {
                             Text(reset)
-                                .font(.system(size: 8.5, weight: .medium, design: .rounded))
+                                .font(.system(size: 8, weight: .medium, design: .rounded))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
@@ -831,21 +890,21 @@ private struct LargeProviderPageView: View {
                 }
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .fill(Color.primary.opacity(0.045))
             )
         } else if let balance = page.balance {
             HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(balance.periodLabel ?? "Available Balance")
                         .font(.system(size: 10.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(.secondary)
 
                     Text(balance.formattedRemaining)
-                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
                         .foregroundStyle(.primary)
                         .contentTransition(.numericText())
                         .lineLimit(1)
@@ -865,21 +924,43 @@ private struct LargeProviderPageView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .fill(Color.primary.opacity(0.045))
             )
         } else {
-            ProviderEmptyDataView(page: page, compact: true)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.primary.opacity(0.045))
-                )
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .stroke(page.accentColor.opacity(0.28), style: StrokeStyle(lineWidth: 3, dash: [3.5, 3.5]))
+                        .frame(width: 36, height: 36)
+                    WidgetProviderBrandIcon(
+                        iconAssetName: page.iconAssetName,
+                        symbolName: page.symbolName,
+                        size: 15
+                    )
+                    .foregroundStyle(page.accentColor.opacity(0.85))
+                    .widgetAccentable()
+                }
+
+                Text(page.errorMessage ?? page.statusNote ?? "Waiting for data…")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color.primary.opacity(0.045))
+            )
         }
     }
 }
@@ -952,44 +1033,53 @@ private struct LargeTrendCard: View {
         let maxValue = points.map(\.value).max() ?? 0
         let hasData = maxValue > 0
 
-        VStack(alignment: .leading, spacing: 7) {
-            // Card Header: "30D Trend" + active peak / today callout
+        VStack(alignment: .leading, spacing: 6) {
+            // Card Header: "Trend" + compact segmented range pill + latest/peak callout
             HStack(spacing: 6) {
-                Text(selectedRange.title)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text("Trend")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
+                    // Range pills: 1D needs hour buckets, 7D/30D slice the daily series.
+                    HStack(spacing: 1.5) {
+                        ForEach(AIUsageChartRange.allCases) { range in
+                            rangePill(range)
+                        }
+                    }
+                    .padding(1.5)
+                    .background(Capsule().fill(Color.primary.opacity(0.06)))
+                    .fixedSize()
+                }
+                .layoutPriority(1)
 
                 Spacer(minLength: 4)
 
                 if hasData {
                     let todayVal = points.last?.value ?? 0
-                    Text("Today \(formatMetricValue(todayVal, for: selectedMetric)) · Peak \(formatMetricValue(maxValue, for: selectedMetric))")
-                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    let latestLabel = selectedRange == .day ? "Last" : "Today"
+                    Text("\(latestLabel) \(formatMetricValue(todayVal, for: selectedMetric)) · Peak \(formatMetricValue(maxValue, for: selectedMetric))")
+                        .font(.system(size: 8.5, weight: .medium, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 } else {
-                    Text(selectedRange == .day ? "Last 24 hours" : "Last \(selectedRange.totalLabel)")
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                    Text(selectedRange == .day ? "Last 24h" : "Last \(selectedRange.totalLabel)")
+                        .font(.system(size: 8.5, weight: .medium, design: .rounded))
                         .foregroundStyle(.secondary.opacity(0.8))
+                        .lineLimit(1)
                 }
             }
 
-            // Range pills: 1D needs hour buckets, 7D/30D slice the daily series.
+            // 3 Interactive Metric Switcher Pills (Single-row compact chips)
             HStack(spacing: 4) {
-                ForEach(AIUsageChartRange.allCases) { range in
-                    rangePill(range)
-                }
-                Spacer(minLength: 0)
-            }
-
-            // 3 Interactive Metric Switcher Pills (Shows all 3 totals at once)
-            HStack(spacing: 5) {
                 ForEach(AIUsageChartMetric.allCases) { metric in
                     metricPill(for: metric)
                 }
             }
 
-            // Smooth 30-Day Line Chart
+            // Smooth Line Chart
             if hasData {
                 trendChartView(points: points, maxValue: maxValue)
             } else {
@@ -1015,10 +1105,10 @@ private struct LargeTrendCard: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
                 .fill(Color.primary.opacity(0.045))
         )
     }
@@ -1027,7 +1117,12 @@ private struct LargeTrendCard: View {
     private func trendChartView(points: [IndexedPoint], maxValue: Double) -> some View {
         let yUpper = niceUpperBound(maxValue)
         let midIndex = points.count / 2
-        let lastIndex = max(1, points.count - 1)
+        let lastIndex = max(0, points.count - 1)
+        let xTickIndices: [Int] = {
+            if points.count <= 1 { return [0] }
+            if points.count == 2 { return [0, 1] }
+            return [0, midIndex, lastIndex]
+        }()
         let seriesLabel = selectedMetric.shortLabel
         let seriesColor = activeSeriesColor
         let areaGradient = LinearGradient(
@@ -1039,70 +1134,81 @@ private struct LargeTrendCard: View {
             endPoint: .bottom
         )
 
-        Chart {
-            ForEach(points) { pt in
-                AreaMark(
-                    x: .value("Day", pt.index),
-                    yStart: .value("Base", 0.0),
-                    yEnd: .value(seriesLabel, pt.value)
-                )
-                .interpolationMethod(.monotone)
-                .foregroundStyle(areaGradient)
+        GeometryReader { proxy in
+            let yTickValues: [Double] = proxy.size.height >= 64 ? [0, yUpper * 0.5, yUpper] : [0, yUpper]
 
-                LineMark(
-                    x: .value("Day", pt.index),
-                    y: .value(seriesLabel, pt.value)
-                )
-                .interpolationMethod(.monotone)
-                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                .foregroundStyle(seriesColor)
-            }
+            Chart {
+                ForEach(points) { pt in
+                    AreaMark(
+                        x: .value("Day", pt.index),
+                        yStart: .value("Base", 0.0),
+                        yEnd: .value(seriesLabel, pt.value)
+                    )
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(areaGradient)
 
-            if let last = points.last, last.value > 0 {
-                PointMark(
-                    x: .value("Day", last.index),
-                    y: .value(seriesLabel, last.value)
-                )
-                .symbolSize(20)
-                .foregroundStyle(seriesColor)
-            } else if let peak = points.max(by: { $0.value < $1.value }), peak.value > 0 {
-                PointMark(
-                    x: .value("Day", peak.index),
-                    y: .value(seriesLabel, peak.value)
-                )
-                .symbolSize(20)
-                .foregroundStyle(seriesColor)
+                    LineMark(
+                        x: .value("Day", pt.index),
+                        y: .value(seriesLabel, pt.value)
+                    )
+                    .interpolationMethod(.monotone)
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    .foregroundStyle(seriesColor)
+                }
+
+                if let last = points.last, last.value > 0 {
+                    PointMark(
+                        x: .value("Day", last.index),
+                        y: .value(seriesLabel, last.value)
+                    )
+                    .symbolSize(20)
+                    .foregroundStyle(seriesColor)
+                } else if let peak = points.max(by: { $0.value < $1.value }), peak.value > 0 {
+                    PointMark(
+                        x: .value("Day", peak.index),
+                        y: .value(seriesLabel, peak.value)
+                    )
+                    .symbolSize(20)
+                    .foregroundStyle(seriesColor)
+                }
             }
-        }
-        .chartXScale(domain: 0...lastIndex)
-        .chartYScale(domain: 0...yUpper)
-        .chartXAxis {
-            AxisMarks(values: [0, midIndex, lastIndex]) { value in
-                if let idx = value.as(Int.self), idx >= 0, idx < points.count {
-                    AxisValueLabel {
-                        Text(idx == lastIndex ? "Today" : points[idx].shortDateLabel)
-                            .font(.system(size: 8, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.secondary.opacity(0.85))
+            .chartXScale(domain: 0...max(1, lastIndex))
+            .chartYScale(domain: 0...yUpper)
+            .chartXAxis {
+                AxisMarks(values: xTickIndices) { value in
+                    if let idx = value.as(Int.self), idx >= 0, idx < points.count {
+                        let anchor: UnitPoint = {
+                            if idx == 0 && points.count > 1 { return .topLeading }
+                            if idx == lastIndex && points.count > 1 { return .topTrailing }
+                            return .top
+                        }()
+                        AxisValueLabel(anchor: anchor) {
+                            Text(idx == lastIndex ? (selectedRange == .day ? "Now" : "Today") : points[idx].shortDateLabel)
+                                .font(.system(size: 8, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.secondary.opacity(0.85))
+                                .fixedSize()
+                        }
                     }
                 }
             }
-        }
-        .chartYAxis {
-            AxisMarks(position: .trailing, values: [0, yUpper * 0.5, yUpper]) { value in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
-                    .foregroundStyle(Color.primary.opacity(0.10))
-                if let num = value.as(Double.self) {
-                    AxisValueLabel {
-                        Text(formatAxisValue(num, for: selectedMetric))
-                            .font(.system(size: 8, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.secondary.opacity(0.85))
+            .chartYAxis {
+                AxisMarks(position: .trailing, values: yTickValues) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
+                        .foregroundStyle(Color.primary.opacity(0.10))
+                    if let num = value.as(Double.self) {
+                        AxisValueLabel {
+                            Text(formatAxisValue(num, for: selectedMetric))
+                                .font(.system(size: 8, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.secondary.opacity(0.85))
+                        }
                     }
                 }
             }
+            .chartLegend(.hidden)
+            .padding(.top, 2)
+            .widgetAccentable()
         }
-        .chartLegend(.hidden)
-        .widgetAccentable()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minHeight: 56, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -1112,14 +1218,14 @@ private struct LargeTrendCard: View {
             Text(range.shortLabel)
                 .font(.system(size: 8.5, weight: isActive ? .bold : .medium, design: .rounded))
                 .foregroundStyle(isActive ? Color.primary : Color.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2.5)
+                .padding(.horizontal, 5.5)
+                .padding(.vertical, 2)
                 .background(
                     Capsule()
-                        .fill(isActive ? page.accentColor.opacity(0.22) : Color.primary.opacity(0.06))
+                        .fill(isActive ? page.accentColor.opacity(0.24) : Color.clear)
                         .overlay {
                             if isActive {
-                                Capsule().strokeBorder(page.accentColor.opacity(0.5), lineWidth: 0.7)
+                                Capsule().strokeBorder(page.accentColor.opacity(0.5), lineWidth: 0.6)
                             }
                         }
                 )
@@ -1134,33 +1240,33 @@ private struct LargeTrendCard: View {
         let totalText = formattedRangeTotal(for: metric)
 
         Button(intent: AIUsageWidgetSelectChartMetricIntent(metric: metric)) {
-            VStack(alignment: .leading, spacing: 1.5) {
-                HStack(spacing: 3.5) {
-                    Circle()
-                        .fill(isActive ? tint : tint.opacity(0.55))
-                        .frame(width: 5, height: 5)
-                        .widgetAccentable()
-                    Text(metric.shortLabel)
-                        .font(.system(size: 9, weight: isActive ? .bold : .medium, design: .rounded))
-                        .foregroundStyle(isActive ? Color.primary : Color.secondary)
-                        .lineLimit(1)
-                }
-
+            HStack(spacing: 3) {
+                Circle()
+                    .fill(isActive ? tint : tint.opacity(0.55))
+                    .frame(width: 4.5, height: 4.5)
+                    .widgetAccentable()
+                Text(metric.shortLabel)
+                    .font(.system(size: 8.5, weight: isActive ? .semibold : .medium, design: .rounded))
+                    .foregroundStyle(isActive ? Color.primary : Color.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 2)
                 Text(totalText)
-                    .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(isActive ? Color.primary : Color.primary.opacity(0.75))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.68)
+                    .layoutPriority(1)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4.5)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 6.5)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(isActive ? tint.opacity(0.16) : Color.primary.opacity(0.05))
                     .overlay {
                         if isActive {
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .strokeBorder(tint.opacity(0.50), lineWidth: 0.85)
                         }
                     }
@@ -1196,7 +1302,35 @@ private struct LargeTrendCard: View {
 
     private func formatAxisValue(_ value: Double, for metric: AIUsageChartMetric) -> String {
         if value <= 0 { return "0" }
-        return formatMetricValue(value, for: metric)
+        switch metric {
+        case .tokens, .requests:
+            return formatCompactCount(value)
+        case .cost:
+            return formatAxisCurrency(value, symbol: page.costCurrencySymbol)
+        }
+    }
+
+    private func formatAxisCurrency(_ value: Double, symbol: String) -> String {
+        if value >= 1000 {
+            let k = value / 1000
+            let formatted = abs(k - k.rounded()) < 0.05 ? String(format: "%.0fK", k) : String(format: "%.1fK", k)
+            return "\(symbol)\(formatted)"
+        } else if value >= 10 {
+            let rounded = value.rounded()
+            if abs(value - rounded) < 0.05 {
+                return "\(symbol)\(Int(rounded))"
+            }
+            return String(format: "%@%.1f", symbol, value)
+        } else if value >= 0.01 {
+            let tenths = (value * 10).rounded() / 10
+            if abs(value - tenths) < 0.005 {
+                return abs(value - value.rounded()) < 0.005
+                    ? "\(symbol)\(Int(value.rounded()))"
+                    : String(format: "%@%.1f", symbol, value)
+            }
+            return String(format: "%@%.2f", symbol, value)
+        }
+        return "\(symbol)0"
     }
 
     private func formatCompactCount(_ value: Double) -> String {
@@ -1340,6 +1474,7 @@ private struct WidgetRingGroupGauge: View {
         if size >= 100 { return 21 }
         if size >= 80 { return 16.5 }
         if size >= 68 { return 14.5 }
+        if size >= 62 { return 13 }
         if size >= 52 { return 11.5 }
         return 9.5
     }
@@ -1507,7 +1642,7 @@ private struct LargeProviderSwitcherBar: View {
                         WidgetProviderBrandIcon(
                             iconAssetName: item.iconAssetName,
                             symbolName: item.symbolName,
-                            size: 11
+                            size: 10.5
                         )
                         .foregroundStyle(isActive ? item.accentColor : .secondary)
                         .widgetAccentable()
@@ -1520,7 +1655,7 @@ private struct LargeProviderSwitcherBar: View {
                         }
                     }
                     .padding(.horizontal, compactMode && !isActive ? 7 : 8)
-                    .padding(.vertical, 5)
+                    .padding(.vertical, 4)
                     .frame(maxWidth: compactMode && !isActive ? nil : .infinity)
                     .background(
                         Capsule()
@@ -1608,3 +1743,573 @@ private enum RelativeTimeFormatter {
         return "\(hrs / 24)d ago"
     }
 }
+
+#if DEBUG
+private enum AIUsageWidgetPreviewFixtures {
+    static let baseDate = Date()
+
+    static func makeDailyHistory(
+        days: Int = 30,
+        referenceDate: Date,
+        values: [(tokens: Int64, cost: Double, requests: Int)]
+    ) -> [AIUsageWidgetDailyPoint] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: referenceDate)
+        let df = DateFormatter()
+        df.calendar = Calendar(identifier: .gregorian)
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.timeZone = .current
+        df.dateFormat = "yyyy-MM-dd"
+
+        return (0..<days).reversed().enumerated().compactMap { idx, offset in
+            guard let date = cal.date(byAdding: .day, value: -offset, to: today) else { return nil }
+            let sample = values[idx % values.count]
+            return AIUsageWidgetDailyPoint(
+                dayKey: df.string(from: date),
+                tokens: sample.tokens,
+                cost: sample.cost,
+                requests: sample.requests
+            )
+        }
+    }
+
+    static func makeHourlyHistory(referenceDate: Date) -> [AIUsageWidgetDailyPoint] {
+        let cal = Calendar.current
+        let df = DateFormatter()
+        df.calendar = Calendar(identifier: .gregorian)
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.timeZone = .current
+        df.dateFormat = "yyyy-MM-dd'T'HH"
+
+        return (0..<24).reversed().enumerated().compactMap { idx, offset in
+            guard let date = cal.date(byAdding: .hour, value: -offset, to: referenceDate) else { return nil }
+            let wave = max(0.05, 0.45 + 0.4 * sin(Double(idx) * 0.42))
+            return AIUsageWidgetDailyPoint(
+                dayKey: df.string(from: date),
+                tokens: Int64((1_800_000 * wave).rounded()),
+                cost: (1.9 * wave * 100).rounded() / 100,
+                requests: max(1, Int((42 * wave).rounded()))
+            )
+        }
+    }
+
+    static func makeProviders(now: Date) -> [AIUsageWidgetProviderPage] {
+        let antigravityDaily = makeDailyHistory(
+            days: 30,
+            referenceDate: now,
+            values: [
+                (22_000_000, 12.4, 175),
+                (38_000_000, 34.2, 290),
+                (41_000_000, 40.0, 320),
+                (31_000_000, 18.6, 240),
+                (18_000_000, 6.2, 160),
+                (10_000_000, 2.32, 95),
+                (4_000_000, 0.28, 20)
+            ]
+        )
+        let last7: [(Int64, Double, Int)] = [
+            (12_000_000, 7.5, 110),
+            (34_000_000, 26.2, 260),
+            (36_000_000, 22.0, 250),
+            (45_000_000, 40.0, 340),
+            (20_000_000, 11.4, 180),
+            (14_000_000, 6.62, 130),
+            (3_000_000, 0.28, 30)
+        ]
+        let agHistory = Array(antigravityDaily.dropLast(7)) + makeDailyHistory(days: 7, referenceDate: now, values: last7)
+
+        let ag2Pool = AIUsageWidgetProviderPage(
+            id: "antigravity",
+            displayName: "Antigravity",
+            shortName: "Antigravity",
+            iconAssetName: "ProviderIcon-antigravity",
+            symbolName: "atom",
+            accentRed: 0.52,
+            accentGreen: 0.80,
+            accentBlue: 0.09,
+            innerRed: 0.36,
+            innerGreen: 0.78,
+            innerBlue: 1.0,
+            planName: "Quota Pools",
+            accountLabel: nil,
+            sourceLabel: "agy-cli",
+            statusNote: nil,
+            errorMessage: nil,
+            updatedAt: now,
+            ringGroups: [
+                AIUsageWidgetRingGroup(
+                    id: "dual_gemini",
+                    label: "Gemini",
+                    outerWindow: AIUsageWidgetWindow(
+                        id: "ag_gemini_5h",
+                        label: "Gemini 5h",
+                        usedPercent: 9,
+                        detailText: nil,
+                        resetAt: now.addingTimeInterval(3 * 3600),
+                        isEstimated: false
+                    ),
+                    innerWindow: AIUsageWidgetWindow(
+                        id: "ag_gemini_7d",
+                        label: "Gemini 7d",
+                        usedPercent: 4,
+                        detailText: nil,
+                        resetAt: now.addingTimeInterval(4 * 86400),
+                        isEstimated: false
+                    )
+                ),
+                AIUsageWidgetRingGroup(
+                    id: "dual_claude_gpt",
+                    label: "Claude/GPT",
+                    outerWindow: AIUsageWidgetWindow(
+                        id: "ag_claude_5h",
+                        label: "Claude/GPT 5h",
+                        usedPercent: 0,
+                        detailText: nil,
+                        resetAt: now.addingTimeInterval(4 * 3600),
+                        isEstimated: false
+                    ),
+                    innerWindow: AIUsageWidgetWindow(
+                        id: "ag_claude_7d",
+                        label: "Claude/GPT 7d",
+                        usedPercent: 22,
+                        detailText: nil,
+                        resetAt: now.addingTimeInterval(5 * 86400),
+                        isEstimated: false
+                    )
+                )
+            ],
+            balance: nil,
+            dailyHistory: agHistory,
+            hourlyHistory: makeHourlyHistory(referenceDate: now),
+            costCurrencySymbol: "≈$"
+        )
+
+        let claude1Pool = AIUsageWidgetProviderPage(
+            id: "claude",
+            displayName: "Claude",
+            shortName: "Claude",
+            iconAssetName: "ProviderIcon-claude",
+            symbolName: "sparkles",
+            accentRed: 0.88,
+            accentGreen: 0.52,
+            accentBlue: 0.36,
+            innerRed: 0.36,
+            innerGreen: 0.78,
+            innerBlue: 1.0,
+            planName: "Max",
+            accountLabel: "user@example.com",
+            sourceLabel: "oauth",
+            statusNote: nil,
+            errorMessage: nil,
+            updatedAt: now,
+            ringGroups: [
+                AIUsageWidgetRingGroup(
+                    id: "dual_default",
+                    label: "All",
+                    outerWindow: AIUsageWidgetWindow(
+                        id: "claude_5h",
+                        label: "5-Hour Session",
+                        usedPercent: 34,
+                        detailText: nil,
+                        resetAt: now.addingTimeInterval(2 * 3600 + 18 * 60),
+                        isEstimated: false
+                    ),
+                    innerWindow: AIUsageWidgetWindow(
+                        id: "claude_7d",
+                        label: "Weekly All Models",
+                        usedPercent: 52,
+                        detailText: nil,
+                        resetAt: now.addingTimeInterval(3 * 86400 + 6 * 3600),
+                        isEstimated: false
+                    )
+                )
+            ],
+            balance: AIUsageWidgetBalance(
+                currency: "USD",
+                remaining: 18.40,
+                usedThisPeriod: 11.60,
+                limit: 30.00,
+                periodLabel: "Extra Usage",
+                formattedRemaining: "$18.40",
+                compactFormattedRemaining: "$18.4",
+                formattedBreakdown: "$18.40 / $30.00"
+            ),
+            dailyHistory: makeDailyHistory(
+                days: 30,
+                referenceDate: now,
+                values: [(14_000_000, 4.2, 90), (21_500_000, 6.8, 125), (9_500_000, 2.9, 64), (17_000_000, 5.1, 102)]
+            ),
+            hourlyHistory: makeHourlyHistory(referenceDate: now),
+            costCurrencySymbol: "≈$"
+        )
+
+        let ag3Pool = AIUsageWidgetProviderPage(
+            id: "antigravity3",
+            displayName: "Antigravity",
+            shortName: "Agy-3",
+            iconAssetName: "ProviderIcon-antigravity",
+            symbolName: "atom",
+            accentRed: 0.52,
+            accentGreen: 0.80,
+            accentBlue: 0.09,
+            innerRed: 0.36,
+            innerGreen: 0.78,
+            innerBlue: 1.0,
+            planName: "Ultra",
+            accountLabel: nil,
+            sourceLabel: "agy-cli",
+            statusNote: nil,
+            errorMessage: nil,
+            updatedAt: now,
+            ringGroups: AIUsageWidgetPayload.sample.providers[1].ringGroups,
+            balance: nil,
+            dailyHistory: agHistory,
+            hourlyHistory: makeHourlyHistory(referenceDate: now),
+            costCurrencySymbol: "≈$"
+        )
+
+        let fourPool = AIUsageWidgetProviderPage(
+            id: "cursor4",
+            displayName: "Cursor Enterprise",
+            shortName: "Cursor",
+            iconAssetName: "ProviderIcon-cursor",
+            symbolName: "cursorarrow.rays",
+            accentRed: 0.32,
+            accentGreen: 0.64,
+            accentBlue: 0.96,
+            innerRed: 0.36,
+            innerGreen: 0.78,
+            innerBlue: 1.0,
+            planName: "Teams",
+            accountLabel: nil,
+            sourceLabel: "api",
+            statusNote: nil,
+            errorMessage: nil,
+            updatedAt: now,
+            ringGroups: [
+                AIUsageWidgetRingGroup(
+                    id: "p1",
+                    label: "Sonnet",
+                    outerWindow: AIUsageWidgetWindow(id: "w1", label: "5h", usedPercent: 28, detailText: nil, resetAt: now.addingTimeInterval(3600), isEstimated: false),
+                    innerWindow: AIUsageWidgetWindow(id: "w1i", label: "7d", usedPercent: 45, detailText: nil, resetAt: now.addingTimeInterval(3 * 86400), isEstimated: false)
+                ),
+                AIUsageWidgetRingGroup(
+                    id: "p2",
+                    label: "Opus",
+                    outerWindow: AIUsageWidgetWindow(id: "w2", label: "5h", usedPercent: 62, detailText: nil, resetAt: now.addingTimeInterval(3600), isEstimated: false),
+                    innerWindow: AIUsageWidgetWindow(id: "w2i", label: "7d", usedPercent: 71, detailText: nil, resetAt: now.addingTimeInterval(3 * 86400), isEstimated: false)
+                ),
+                AIUsageWidgetRingGroup(
+                    id: "p3",
+                    label: "GPT-5",
+                    outerWindow: AIUsageWidgetWindow(id: "w3", label: "5h", usedPercent: 14, detailText: nil, resetAt: now.addingTimeInterval(3600), isEstimated: false),
+                    innerWindow: AIUsageWidgetWindow(id: "w3i", label: "7d", usedPercent: 19, detailText: nil, resetAt: now.addingTimeInterval(3 * 86400), isEstimated: false)
+                ),
+                AIUsageWidgetRingGroup(
+                    id: "p4",
+                    label: "Fast",
+                    outerWindow: AIUsageWidgetWindow(id: "w4", label: "5h", usedPercent: 5, detailText: nil, resetAt: now.addingTimeInterval(3600), isEstimated: false),
+                    innerWindow: AIUsageWidgetWindow(id: "w4i", label: "7d", usedPercent: 12, detailText: nil, resetAt: now.addingTimeInterval(3 * 86400), isEstimated: false)
+                )
+            ],
+            balance: nil,
+            dailyHistory: agHistory,
+            hourlyHistory: makeHourlyHistory(referenceDate: now),
+            costCurrencySymbol: "$"
+        )
+
+        let balanceOnly = AIUsageWidgetProviderPage(
+            id: "openrouter",
+            displayName: "OpenRouter",
+            shortName: "OpenRouter",
+            iconAssetName: "ProviderIcon-openrouter",
+            symbolName: "network",
+            accentRed: 0.64,
+            accentGreen: 0.44,
+            accentBlue: 0.96,
+            innerRed: 0.72,
+            innerGreen: 0.56,
+            innerBlue: 1.0,
+            planName: nil,
+            accountLabel: nil,
+            sourceLabel: "api-key",
+            statusNote: nil,
+            errorMessage: nil,
+            updatedAt: now,
+            ringGroups: [],
+            balance: AIUsageWidgetBalance(
+                currency: "USD",
+                remaining: 42.85,
+                usedThisPeriod: 17.15,
+                limit: 60.00,
+                periodLabel: "Prepaid Wallet",
+                formattedRemaining: "$42.85",
+                compactFormattedRemaining: "$42.9",
+                formattedBreakdown: "$17.15 used · $60.00 cap"
+            ),
+            dailyHistory: makeDailyHistory(
+                days: 30,
+                referenceDate: now,
+                values: [(4_500_000, 1.85, 45), (8_200_000, 3.40, 82), (2_100_000, 0.92, 24), (6_000_000, 2.55, 63)]
+            ),
+            hourlyHistory: makeHourlyHistory(referenceDate: now),
+            costCurrencySymbol: "$"
+        )
+
+        return [ag2Pool, claude1Pool, ag3Pool, fourPool, balanceOnly]
+    }
+
+    static func makeLargePayload(now: Date = baseDate) -> AIUsageWidgetPayload {
+        AIUsageWidgetPayload(
+            schemaVersion: AIUsageWidgetSharedConstants.currentSchemaVersion,
+            updatedAt: now,
+            showRemainingPercent: true,
+            hideAccountEmails: false,
+            providers: makeProviders(now: now)
+        )
+    }
+
+    static func makeEmptyPage(now: Date = baseDate) -> AIUsageWidgetProviderPage {
+        AIUsageWidgetProviderPage(
+            id: "empty",
+            displayName: "DeepSeek",
+            shortName: "DeepSeek",
+            iconAssetName: "ProviderIcon-deepseek",
+            symbolName: "magnifyingglass.circle",
+            accentRed: 0.30,
+            accentGreen: 0.56,
+            accentBlue: 0.96,
+            innerRed: 0.36,
+            innerGreen: 0.78,
+            innerBlue: 1.0,
+            planName: nil,
+            accountLabel: nil,
+            sourceLabel: "api",
+            statusNote: "Waiting for next refresh cycle…",
+            errorMessage: nil,
+            updatedAt: now,
+            ringGroups: [],
+            balance: nil,
+            dailyHistory: [],
+            hourlyHistory: [],
+            costCurrencySymbol: "$"
+        )
+    }
+}
+
+private struct WidgetCanvasCard<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let accentColor: Color
+    let width: CGFloat
+    let height: CGFloat
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .background {
+                WidgetAmbientBackground(
+                    accentColor: accentColor,
+                    renderingMode: .fullColor,
+                    colorScheme: colorScheme
+                )
+            }
+            .frame(width: width, height: height)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+            )
+            .preferredColorScheme(.dark)
+    }
+}
+
+private struct LargeWidgetInteractivePreview: View {
+    enum Scenario: String, CaseIterable, Identifiable {
+        case twoPools = "2 Pools"
+        case onePool = "1 Pool"
+        case threePools = "3 Pools"
+        case fourPools = "4 Pools"
+        case balance = "Balance"
+        case empty = "Empty"
+
+        var id: String { rawValue }
+    }
+
+    @State private var scenario: Scenario = .twoPools
+    @State private var range: AIUsageChartRange = .week
+    @State private var metric: AIUsageChartMetric = .cost
+
+    private let now = AIUsageWidgetPreviewFixtures.baseDate
+
+    private var providers: [AIUsageWidgetProviderPage] {
+        AIUsageWidgetPreviewFixtures.makeProviders(now: now)
+    }
+
+    private var activeSelection: (page: AIUsageWidgetProviderPage, all: [AIUsageWidgetProviderPage], index: Int) {
+        let baseProviders = providers
+        switch scenario {
+        case .twoPools:
+            return (baseProviders[0], baseProviders, 1)
+        case .onePool:
+            return (baseProviders[1], baseProviders, 0)
+        case .threePools:
+            return (baseProviders[2], baseProviders, 2)
+        case .fourPools:
+            return (baseProviders[3], baseProviders, 3)
+        case .balance:
+            return (baseProviders[4], baseProviders, 4)
+        case .empty:
+            let emptyPage = AIUsageWidgetPreviewFixtures.makeEmptyPage(now: now)
+            return (emptyPage, [emptyPage] + Array(baseProviders.dropFirst()), 0)
+        }
+    }
+
+    var body: some View {
+        let selection = activeSelection
+        VStack(spacing: 10) {
+            HStack(spacing: 4) {
+                ForEach(Scenario.allCases) { item in
+                    let isSelected = item == scenario
+                    Button {
+                        scenario = item
+                    } label: {
+                        Text(item.rawValue)
+                            .font(.system(size: 10, weight: isSelected ? .semibold : .medium, design: .rounded))
+                            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3.5)
+                            .background(
+                                Capsule()
+                                    .fill(isSelected ? selection.page.accentColor.opacity(0.24) : Color.primary.opacity(0.08))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Picker("Range", selection: $range) {
+                    ForEach(AIUsageChartRange.allCases) { item in
+                        Text(item.shortLabel).tag(item)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+
+                Picker("Metric", selection: $metric) {
+                    ForEach(AIUsageChartMetric.allCases) { item in
+                        Text(item.shortLabel).tag(item)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
+            .frame(width: 328)
+
+            WidgetCanvasCard(accentColor: selection.page.accentColor, width: 328, height: 326) {
+                LargeProviderPageView(
+                    page: selection.page,
+                    allProviders: selection.all,
+                    pageIndex: selection.index,
+                    totalPages: selection.all.count,
+                    familyKey: "large",
+                    showRemaining: true,
+                    selectedChartMetric: metric,
+                    selectedChartRange: range,
+                    updatedAt: now,
+                    referenceDate: now
+                )
+            }
+        }
+        .padding(16)
+        .background(Color(red: 0.05, green: 0.06, blue: 0.07))
+        .preferredColorScheme(.dark)
+    }
+}
+
+@MainActor
+private func makeLargePreviewCard(
+    providerIndex: Int,
+    pageIndex: Int,
+    metric: AIUsageChartMetric,
+    range: AIUsageChartRange
+) -> some View {
+    let now = AIUsageWidgetPreviewFixtures.baseDate
+    let providers = AIUsageWidgetPreviewFixtures.makeProviders(now: now)
+    let page = providers[providerIndex]
+    return WidgetCanvasCard(accentColor: page.accentColor, width: 328, height: 326) {
+        LargeProviderPageView(
+            page: page,
+            allProviders: providers,
+            pageIndex: pageIndex,
+            totalPages: providers.count,
+            familyKey: "large",
+            showRemaining: true,
+            selectedChartMetric: metric,
+            selectedChartRange: range,
+            updatedAt: now,
+            referenceDate: now
+        )
+    }
+    .padding(16)
+}
+
+#Preview("Large · Interactive") {
+    LargeWidgetInteractivePreview()
+}
+
+#Preview("Large · 2 Pools (7D Spend)") {
+    makeLargePreviewCard(providerIndex: 0, pageIndex: 1, metric: .cost, range: .week)
+}
+
+#Preview("Large · 1 Pool + Balance") {
+    makeLargePreviewCard(providerIndex: 1, pageIndex: 0, metric: .tokens, range: .month)
+}
+
+#Preview("Large · 3 Pools") {
+    makeLargePreviewCard(providerIndex: 2, pageIndex: 2, metric: .cost, range: .week)
+}
+
+#Preview("Large · 4 Pools (1D)") {
+    makeLargePreviewCard(providerIndex: 3, pageIndex: 3, metric: .requests, range: .day)
+}
+
+#Preview("Large · Balance Only") {
+    makeLargePreviewCard(providerIndex: 4, pageIndex: 4, metric: .cost, range: .month)
+}
+
+#Preview("Medium & Small") {
+    let now = AIUsageWidgetPreviewFixtures.baseDate
+    let providers = AIUsageWidgetPreviewFixtures.makeProviders(now: now)
+    let claude = providers[1]
+    let antigravity = providers[0]
+
+    return VStack(spacing: 14) {
+        WidgetCanvasCard(accentColor: antigravity.accentColor, width: 328, height: 158) {
+            MediumProviderPageView(
+                page: antigravity,
+                allProviders: providers,
+                pageIndex: 0,
+                totalPages: providers.count,
+                familyKey: "medium",
+                showRemaining: true,
+                updatedAt: now,
+                referenceDate: now
+            )
+        }
+
+        WidgetCanvasCard(accentColor: claude.accentColor, width: 158, height: 158) {
+            SmallProviderPageView(
+                page: claude,
+                allProviders: providers,
+                pageIndex: 1,
+                totalPages: providers.count,
+                familyKey: "small",
+                showRemaining: true,
+                referenceDate: now
+            )
+        }
+    }
+    .padding(16)
+}
+#endif
